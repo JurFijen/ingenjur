@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PlotrPlan Pro</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- React & ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <!-- Babel for in-browser JSX compilation -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    .map-plotting-mode .leaflet-interactive, .map-plotting-mode .leaflet-container { cursor: crosshair !important; }
+    .map-night-mode .leaflet-tile-pane { filter: grayscale(100%) sepia(100%) hue-rotate(315deg) brightness(0.6) contrast(1.5); }
+    .leaflet-control-container { z-index: 10; }
+    .leaflet-tooltip { border-radius: 8px !important; }
+    .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+  </style>
+
+  <!-- Embedded Saved State -->
+  <script id="plotr-state" type="application/json"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    // Standard Ports Database
+    const standardPortsDB = [
+      { 
+        group: 'IJSSELMEER (Directe toegang)', 
+        ports: [
+          { name: 'Hindeloopen', lat: 52.943000, lon: 5.398000 },
+          { name: 'Workum', lat: 52.978000, lon: 5.435000 },
+          { name: 'Stavoren', lat: 52.886000, lon: 5.358000 },
+          { name: 'Enkhuizen', lat: 52.705000, lon: 5.298000 },
+          { name: 'Medemblik', lat: 52.772000, lon: 5.115000 },
+        ]
+      },
+      { 
+        group: 'WADDENZEE (Via Lorentzsluizen)', 
+        ports: [
+          { name: 'Harlingen', lat: 53.175000, lon: 5.412000 },
+          { name: 'Terschelling (West)', lat: 53.360000, lon: 5.215000 },
+          { name: 'Vlieland', lat: 53.296000, lon: 5.090000 },
+          { name: 'Texel (Oudeschild)', lat: 53.039000, lon: 4.850000 },
+        ]
+      }
+    ];
+
+    const defaultWaypoints = [
+      { id: 1, scenario: 'A', name: 'Makkum Marina', lat: 53.056000, lon: 5.398000, depth: 3.5, tideSet: 0, tideRate: 0, lightChar: '', notes: 'Depart 2h before HW Harlingen' },
+      { id: 2, scenario: 'A', name: 'Lorentzsluizen', lat: 53.067000, lon: 5.334000, depth: 4.0, tideSet: 20, tideRate: 0.5, lightChar: 'Iso.4s', notes: 'Lock passage into Waddenzee' },
+      { id: 3, scenario: 'A', name: 'Harlingen Approach', lat: 53.175000, lon: 5.412000, depth: 5.2, tideSet: 45, tideRate: 1.8, lightChar: 'Fl(2)10s', notes: 'Watch for ferries crossing' }
+    ];
+
+    const defaultPois = [
+      { id: 1, name: 'Kornwerderzand Wait', type: 'Other', details: 'Waiting pontoon before lock entry.', lat: 53.072000, lon: 5.338000, relatedWpId: 2 }
+    ];
+
+    const defaultContingencies = [
+      { 
+        id: 1, 
+        name: 'Workum', 
+        lat: 52.978000, 
+        lon: 5.435000, 
+        relatedWpId: 1, 
+        abortPoint: 'If engine issues before lock', 
+        details: 'Approach via marked channel. Depth 2.5m. Call harbour master on VHF 31.', 
+        isActive: false 
+      }
+    ];
+
+    function App() {
+      // Load Embedded State
+      const initialState = useMemo(() => {
+         try {
+            const stateEl = document.getElementById('plotr-state');
+            if (stateEl && stateEl.textContent) {
+               return JSON.parse(stateEl.textContent);
+            }
+         } catch(e) { console.error("Error loading saved state", e); }
+         return null;
+      }, []);
+
+      // Global State
+      const [tripName, setTripName] = useState(initialState?.tripName ?? 'My Summer Voyage');
+      const [isNightMode, setIsNightMode] = useState(initialState?.isNightMode ?? false);
+      const [timeMode, setTimeMode] = useState(initialState?.timeMode ?? 'LT');
+      const [saveStatus, setSaveStatus] = useState('');
+      
+      // Scenarios State
+      const [activeScenario, setActiveScenario] = useState(initialState?.activeScenario ?? 'A');
+      const scenarioOptions = Array.from({length: 26}, (_, i) => String.fromCharCode(65 + i));
+
+      // Drag & Drop State
+      const [dragIndex, setDragIndex] = useState(null);
+      const [dragOverIndex, setDragOverIndex] = useState(null);
+      
+      // Map Interactive State
+      const [plotMode, setPlotMode] = useState('off'); // 'off', 'wp', 'poi', 'refuge'
+      const [isSatellite, setIsSatellite] = useState(false);
+      const [showDepth, setShowDepth] = useState(true);
+      
+      // Vessel State
+      const [vessel, setVessel] = useState(initialState?.vessel ?? {
+        name: 'SV Seabird',
+        mmsi: '235123456',
+        draft: 1.8,
+        airDraft: 14.5,
+        speed: 6.0, 
+        crewNotes: 'John (Skipper), Sarah (Asthma - inhaler in grab bag)'
+      });
+
+      // Weather State
+      const [weather, setWeather] = useState(initialState?.weather ?? {
+        source: 'KNMI / Marifoon',
+        issueTime: new Date(Date.now() - 2 * 3600 * 1000).toISOString().slice(0, 16),
+        wind: 'SW 15-20 kts (Bft 5)',
+        visibility: 'Good',
+        seaState: 'Moderate'
+      });
+
+      // Plotting Data State
+      const [waypoints, setWaypoints] = useState(initialState?.waypoints ?? defaultWaypoints);
+      const [pois, setPois] = useState(initialState?.pois ?? defaultPois);
+      const [contingencies, setContingencies] = useState(initialState?.contingencies ?? defaultContingencies);
+
+      const mapRef = useRef(null);
+      const mapInstance = useRef(null);
+      const markersRef = useRef([]);
+      const polylineRef = useRef(null);
+      const refugeLinesRef = useRef([]);
+      const mapLayersRef = useRef({});
+      const handleMapClickRef = useRef(null);
+
+      // Save Self-Modifying HTML Function
+      const saveHTML = () => {
+        const stateToSave = {
+          tripName, isNightMode, timeMode, activeScenario, vessel, weather, waypoints, pois, contingencies
+        };
+
+        const clone = document.documentElement.cloneNode(true);
+        const root = clone.querySelector('#root');
+        if (root) root.innerHTML = '';
+        
+        const scripts = clone.querySelectorAll('script');
+        scripts.forEach(s => {
+          const isBabel = s.src && s.src.includes('babel.min.js');
+          const isReact = s.src && s.src.includes('react');
+          const isTailwind = s.src && s.src.includes('tailwindcss');
+          const isLeaflet = s.id === 'leaflet-script' || (s.src && s.src.includes('leaflet.js'));
+          const isBabelSource = s.type === 'text/babel';
+          const isStateScript = s.id === 'plotr-state';
+          
+          if (!isBabel && !isReact && !isTailwind && !isLeaflet && !isBabelSource && !isStateScript) {
+             s.remove();
+          }
+        });
+        
+        let stateScript = clone.querySelector('#plotr-state');
+        if (!stateScript) {
+          stateScript = document.createElement('script');
+          stateScript.id = 'plotr-state';
+          stateScript.type = 'application/json';
+          clone.querySelector('head').appendChild(stateScript);
+        }
+        stateScript.textContent = JSON.stringify(stateToSave);
+        
+        const htmlContent = '<!DOCTYPE html>\n<html lang="en">\n' + clone.innerHTML + '\n</html>';
+        const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'PlotrPlan_Pro.html'; 
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
+
+        setSaveStatus('Saved HTML!');
+        setTimeout(() => setSaveStatus(''), 3000);
+      };
+
+      // Export to Markdown for Obsidian
+      const handleExportMarkdown = () => {
+        const safeTripName = tripName || 'PlotrPlan Trip';
+        
+        let md = `---\n`;
+        md += `trip_name: "${safeTripName}"\n`;
+        md += `date: ${new Date().toISOString()}\n`;
+        md += `vessel: "${vessel.name}"\n`;
+        md += `tags:\n  - passage-plan\n  - sailing\n`;
+        md += `---\n\n`;
+
+        md += `# ⛵ ${safeTripName}\n\n`;
+
+        md += `## 🚢 Vessel & Crew\n`;
+        md += `- **Name:** ${vessel.name} (MMSI: ${vessel.mmsi})\n`;
+        md += `- **Draft:** ${vessel.draft}m | **Speed:** ${vessel.speed} kts\n`;
+        md += `- **Crew / Private Notes:**\n  > ${vessel.crewNotes.replace(/\n/g, '\n> ')}\n\n`;
+
+        md += `## 🌤 Weather Matrix\n`;
+        md += `- **Source:** ${weather.source}\n`;
+        md += `- **Issue Time:** ${weather.issueTime}\n`;
+        md += `- **Wind:** ${weather.wind}\n`;
+        md += `- **Sea State:** ${weather.seaState}\n`;
+        md += `- **Visibility:** ${weather.visibility}\n\n`;
+
+        md += `## 🗺 Scenarios Summary\n`;
+        ['A', 'B', 'C'].forEach(sc => {
+          const wps = waypoints.filter(w => w.scenario === sc);
+          if (wps.length === 0) return;
+          let dist = 0;
+          for(let i=0; i<wps.length-1; i++) {
+             dist += parseFloat(calculateNav(wps[i], wps[i+1]).distance);
+          }
+          md += `- **Plan ${sc}**: ${wps.length} Waypoints, ${dist.toFixed(1)} NM Total Distance ${activeScenario === sc ? '*(Active)*' : ''}\n`;
+        });
+        md += `\n`;
+
+        md += `## 📍 Waypoints (Scenario ${activeScenario})\n`;
+        md += `| WP | Name | Coordinates | CTS to Next | Dist to Next | Notes |\n`;
+        md += `|---|---|---|---|---|---|\n`;
+        activeWaypoints.forEach((wp, i) => {
+           const nextWp = activeWaypoints[i+1];
+           const nav = nextWp ? calculateNav(wp, nextWp) : null;
+           const cts = nav ? `${nav.cts}°` : '-';
+           const dist = nav ? `${nav.distance} NM` : '-';
+           md += `| ${String(i+1).padStart(2,'0')} | ${wp.name} | ${wp.lat.toFixed(5)}N, ${Math.abs(wp.lon).toFixed(5)}${wp.lon < 0 ? 'W' : 'E'} | ${cts} | ${dist} | ${wp.notes} |\n`;
+        });
+        md += `\n`;
+
+        md += `## ⚓ Contingencies & Abort Plans\n`;
+        if (contingencies.length === 0) md += `*No contingencies planned.*\n\n`;
+        contingencies.forEach((c, i) => {
+           const letter = String.fromCharCode(66 + i);
+           md += `### Plan ${letter}: ${c.name}\n`;
+           md += `- **Location:** [${c.lat.toFixed(5)}, ${c.lon.toFixed(5)}]\n`;
+           md += `- **Abort Point:** ${c.abortPoint || 'None'}\n`;
+           md += `- **Details:** ${c.details || 'None'}\n\n`;
+        });
+
+        md += `## 📌 Points of Interest\n`;
+        if (pois.length === 0) md += `*No POIs logged.*\n\n`;
+        pois.forEach(p => {
+           md += `- **${p.name}** (${p.type}): ${p.details} [${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}]\n`;
+        });
+
+        const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        const filenameStr = safeTripName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        const isoDate = new Date().toISOString().replace(/[:.]/g, '-');
+        a.download = `${filenameStr}_${isoDate}.md`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
+      };
+
+      // Derived States
+      const isWeatherStale = useMemo(() => {
+        if (!weather.issueTime) return false;
+        const ageHours = (Date.now() - new Date(weather.issueTime).getTime()) / 3600000;
+        return ageHours > 6;
+      }, [weather.issueTime]);
+
+      const activeWaypoints = useMemo(() => waypoints.filter(w => w.scenario === activeScenario), [waypoints, activeScenario]);
+
+      // Map Zoom Function
+      const handleZoomTo = (lat, lon) => {
+        if (mapInstance.current) {
+          mapInstance.current.flyTo([lat, lon], 14, { animate: true, duration: 1 });
+        }
+      };
+
+      // Math Functions for Nav Table
+      const calculateNav = (wp1, wp2) => {
+        const R = 3440; // Nautical Miles
+        const dLat = (wp2.lat - wp1.lat) * Math.PI / 180;
+        const dLon = (wp2.lon - wp1.lon) * Math.PI / 180;
+        const lat1 = wp1.lat * Math.PI / 180;
+        const lat2 = wp2.lat * Math.PI / 180;
+
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.sin(dLon/2) * Math.sin(dLon/2) * Math.cos(lat1) * Math.cos(lat2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        const distance = R * c;
+
+        const y = Math.sin(dLon) * Math.cos(lat2);
+        const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+        const bearing = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+
+        let cts = bearing;
+        const tideSpeed = parseFloat(wp1.tideRate) || 0;
+        const tideDir = parseFloat(wp1.tideSet) || 0;
+        const boatSpeed = parseFloat(vessel.speed);
+
+        if (tideSpeed > 0 && boatSpeed > 0) {
+          const sinDrift = (tideSpeed * Math.sin((tideDir - bearing) * Math.PI / 180)) / boatSpeed;
+          if (Math.abs(sinDrift) <= 1) { 
+            const driftAngle = Math.asin(sinDrift) * 180 / Math.PI;
+            cts = (bearing - driftAngle + 360) % 360;
+          }
+        }
+
+        return { distance: distance.toFixed(1), bearing: Math.round(bearing), cts: Math.round(cts) };
+      };
+
+      // State Handlers
+      const addWaypoint = () => {
+        const newId = waypoints.length > 0 ? Math.max(...waypoints.map(w => w.id)) + 1 : 1;
+        setWaypoints([...waypoints, { 
+          id: newId, scenario: activeScenario, name: `WP ${newId}`, lat: 53.000000, lon: 5.000000, 
+          depth: 5.0, tideSet: 0, tideRate: 0, lightChar: '', notes: '' 
+        }]);
+      };
+      const updateWaypoint = (id, field, value) => setWaypoints(waypoints.map(wp => wp.id === id ? { ...wp, [field]: value } : wp));
+      const removeWaypoint = (id) => setWaypoints(waypoints.filter(wp => wp.id !== id));
+      
+      const updatePoi = (id, field, value) => setPois(pois.map(p => p.id === id ? { ...p, [field]: value } : p));
+      const removePoi = (id) => setPois(pois.filter(p => p.id !== id));
+      
+      const addContingency = () => {
+        const newId = contingencies.length > 0 ? Math.max(...contingencies.map(c => c.id)) + 1 : 1;
+        setContingencies([...contingencies, { id: newId, name: '', lat: 53.000000, lon: 5.000000, relatedWpId: '', abortPoint: '', details: '', isActive: false }]);
+      };
+      const updateContingency = (id, field, value) => setContingencies(contingencies.map(c => c.id === id ? { ...c, [field]: value } : c));
+      const removeContingency = (id) => setContingencies(contingencies.filter(c => c.id !== id));
+      
+      const applyStandardPort = (contId, portName) => {
+        if (!portName) return;
+        let selectedPort = null;
+        standardPortsDB.forEach(group => {
+          const port = group.ports.find(p => p.name === portName);
+          if (port) selectedPort = port;
+        });
+        
+        if (selectedPort) {
+          setContingencies(contingencies.map(c => c.id === contId ? { ...c, name: selectedPort.name, lat: selectedPort.lat, lon: selectedPort.lon } : c));
+        }
+      };
+
+      // Drag and Drop Logic
+      const handleDragStart = (e, index) => {
+        setDragIndex(index);
+        e.dataTransfer.effectAllowed = "move";
+      };
+      const handleDragEnter = (e, index) => setDragOverIndex(index);
+      const handleDragOver = (e) => e.preventDefault();
+      const handleDrop = (e, dropIndex) => {
+        e.preventDefault();
+        if (dragIndex === null || dragIndex === dropIndex) {
+          setDragIndex(null); setDragOverIndex(null); return;
+        }
+        const otherWps = waypoints.filter(w => w.scenario !== activeScenario);
+        const reorderedActiveWps = [...activeWaypoints];
+        const [draggedItem] = reorderedActiveWps.splice(dragIndex, 1);
+        reorderedActiveWps.splice(dropIndex, 0, draggedItem);
+        
+        setWaypoints([...otherWps, ...reorderedActiveWps]);
+        setDragIndex(null); setDragOverIndex(null);
+      };
+
+      const togglePlotMode = (mode) => setPlotMode(prev => prev === mode ? 'off' : mode);
+
+      // Map Click Logic
+      useEffect(() => {
+        handleMapClickRef.current = (e) => {
+          if (plotMode === 'off') return;
+          const { lat, lng } = e.latlng;
+          
+          let closestWpId = '';
+          let minDistance = Infinity;
+          activeWaypoints.forEach(wp => {
+              const dist = Math.sqrt(Math.pow(lat - wp.lat, 2) + Math.pow(lng - wp.lon, 2));
+              if(dist < minDistance) { minDistance = dist; closestWpId = wp.id; }
+          });
+
+          if (plotMode === 'wp') {
+            const newId = waypoints.length > 0 ? Math.max(...waypoints.map(w => w.id)) + 1 : 1;
+            setWaypoints(prev => [...prev, { 
+              id: newId, scenario: activeScenario, name: `WP ${newId}`, lat: parseFloat(lat.toFixed(6)), lon: parseFloat(lng.toFixed(6)), 
+              depth: 5.0, tideSet: 0, tideRate: 0, lightChar: '', notes: '' 
+            }]);
+          } else if (plotMode === 'poi') {
+            const newId = pois.length > 0 ? Math.max(...pois.map(p => p.id)) + 1 : 1;
+            setPois(prev => [...prev, { 
+              id: newId, name: `Locating...`, type: 'Other', details: '', 
+              lat: parseFloat(lat.toFixed(6)), lon: parseFloat(lng.toFixed(6)), relatedWpId: closestWpId
+            }]);
+
+            fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=14`)
+              .then(res => res.json())
+              .then(data => {
+                let suggestedName = data.name || data.address?.water || data.address?.bay || data.address?.county || `POI at ${lat.toFixed(2)}`;
+                setPois(prev => prev.map(p => p.id === newId ? { ...p, name: `Near ${suggestedName}` } : p));
+              })
+              .catch(() => setPois(prev => prev.map(p => p.id === newId ? { ...p, name: `POI ${newId}` } : p)));
+          } else if (plotMode === 'refuge') {
+            const newId = contingencies.length > 0 ? Math.max(...contingencies.map(c => c.id)) + 1 : 1;
+            setContingencies(prev => [...prev, {
+                id: newId, name: 'Map Refuge Point', lat: parseFloat(lat.toFixed(6)), lon: parseFloat(lng.toFixed(6)),
+                relatedWpId: closestWpId, abortPoint: '', details: '', isActive: false
+            }]);
+          }
+        };
+      }, [plotMode, waypoints, activeWaypoints, pois, contingencies, activeScenario]);
+
+      // Leaflet Map Initialization
+      useEffect(() => {
+        if (window.L && !mapInstance.current && mapRef.current) {
+          const map = window.L.map(mapRef.current).setView([53.056, 5.398], 10);
+          
+          const osmLayer = window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, zIndex: 1, attribution: '&copy; OpenStreetMap' });
+          const satLayer = window.L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, zIndex: 1, attribution: 'Tiles &copy; Esri' });
+          const seamarkLayer = window.L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', { maxZoom: 19, zIndex: 3, attribution: '&copy; OpenSeaMap' });
+          const depthLayer = window.L.tileLayer.wms('https://ows.emodnet-bathymetry.eu/wms', {
+              layers: 'emodnet:contours', format: 'image/png', transparent: true, opacity: 0.75, zIndex: 2, attribution: '&copy; EMODnet'
+          });
+
+          mapLayersRef.current = { osm: osmLayer, sat: satLayer, seamark: seamarkLayer, depth: depthLayer };
+
+          (isSatellite ? satLayer : osmLayer).addTo(map);
+          if (showDepth) depthLayer.addTo(map);
+          seamarkLayer.addTo(map);
+
+          map.on('click', (e) => { if (handleMapClickRef.current) handleMapClickRef.current(e); });
+          mapInstance.current = map;
+
+          if (activeWaypoints.length > 0) {
+            map.fitBounds(window.L.latLngBounds(activeWaypoints.map(wp => [wp.lat, wp.lon])), { padding: [50, 50] });
+          }
+        }
+        
+        return () => { if (mapInstance.current) { mapInstance.current.remove(); mapInstance.current = null; } };
+      }, []);
+
+      // Handle Base Map Toggles
+      useEffect(() => {
+        if (!mapInstance.current || !mapLayersRef.current.osm) return;
+        const map = mapInstance.current;
+        const { osm, sat, seamark, depth } = mapLayersRef.current;
+        
+        if (isSatellite) {
+          if (map.hasLayer(osm)) map.removeLayer(osm);
+          if (!map.hasLayer(sat)) map.addLayer(sat);
+        } else {
+          if (map.hasLayer(sat)) map.removeLayer(sat);
+          if (!map.hasLayer(osm)) map.addLayer(osm);
+        }
+
+        if (showDepth) {
+          if (!map.hasLayer(depth)) map.addLayer(depth);
+        } else {
+          if (map.hasLayer(depth)) map.removeLayer(depth);
+        }
+      }, [isSatellite, showDepth]);
+
+      // Handle Map Markers and Lines
+      useEffect(() => {
+        if (!mapInstance.current || !window.L) return;
+        const map = mapInstance.current;
+
+        markersRef.current.forEach(m => map.removeLayer(m));
+        markersRef.current = [];
+        if (polylineRef.current) map.removeLayer(polylineRef.current);
+        refugeLinesRef.current.forEach(l => map.removeLayer(l));
+        refugeLinesRef.current = [];
+
+        const latlngs = activeWaypoints.map(wp => [wp.lat, wp.lon]);
+
+        activeWaypoints.forEach((wp, index) => {
+          const displayIndex = String(index + 1).padStart(2, '0');
+          const wpIcon = window.L.divIcon({
+            className: 'custom-div-icon',
+            html: `<div style="background-color: ${isNightMode ? '#7f1d1d' : '#2563eb'}; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">${displayIndex}</div>`,
+            iconSize: [24, 24], iconAnchor: [12, 12]
+          });
+          const marker = window.L.marker([wp.lat, wp.lon], { icon: wpIcon }).addTo(map);
+          marker.bindTooltip(
+            `<div class="text-xs"><b>${wp.name || `WP ${wp.id}`}</b><br/><span class="text-[10px] opacity-80">${wp.lat.toFixed(6)}N, ${Math.abs(wp.lon).toFixed(6)}${wp.lon < 0 ? 'W' : 'E'}</span></div>`, 
+            { permanent: true, direction: 'right', className: `font-bold border-0 shadow-md backdrop-blur-sm ${isNightMode ? 'bg-red-950/90 text-red-500' : 'bg-white/90 text-slate-800'}` }
+          );
+          markersRef.current.push(marker);
+        });
+
+        if (latlngs.length > 1) {
+          polylineRef.current = window.L.polyline(latlngs, {
+            color: isNightMode ? '#ef4444' : '#3b82f6', weight: 3, dashArray: '8, 8'
+          }).addTo(map);
+        }
+
+        pois.forEach((poi) => {
+          const poiIcon = window.L.divIcon({
+            className: 'custom-div-icon',
+            html: `<div style="background-color: #f59e0b; color: white; border-radius: 4px; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 12px; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.5); transform: rotate(45deg);"><div style="transform: rotate(-45deg); font-weight: bold;">${poi.type.charAt(0)}</div></div>`,
+            iconSize: [20, 20], iconAnchor: [10, 10]
+          });
+          const marker = window.L.marker([poi.lat, poi.lon], { icon: poiIcon }).addTo(map);
+          marker.bindTooltip(
+            `<div class="text-xs"><b>${poi.name}</b><br/><span class="text-[10px] text-amber-600">${poi.type}</span></div>`,
+            { direction: 'top', className: `font-bold border-0 shadow-md backdrop-blur-sm ${isNightMode ? 'bg-black/90 text-amber-500' : 'bg-white/90 text-slate-800'}` }
+          );
+          markersRef.current.push(marker);
+        });
+
+        contingencies.forEach((cont, idx) => {
+          const planLetter = String.fromCharCode(66 + idx);
+          if (cont.lat && cont.lon) {
+            const contIcon = window.L.divIcon({
+              className: 'custom-div-icon',
+              html: `<div style="background-color: ${cont.isActive ? '#10b981' : '#f59e0b'}; color: white; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">${planLetter}⚓</div>`,
+              iconSize: [26, 26], iconAnchor: [13, 13]
+            });
+            const marker = window.L.marker([cont.lat, cont.lon], { icon: contIcon }).addTo(map);
+            marker.bindTooltip(
+              `<div class="text-xs"><b>Plan ${planLetter}: ${cont.name || 'Refuge'}</b><br/><span class="text-[10px] text-amber-600">Port of Refuge</span></div>`,
+              { direction: 'top', className: `font-bold border-0 shadow-md backdrop-blur-sm ${isNightMode ? 'bg-black/90 text-amber-500' : 'bg-white/90 text-slate-800'}` }
+            );
+            markersRef.current.push(marker);
+
+            if (cont.relatedWpId) {
+              const wp = activeWaypoints.find(w => w.id === cont.relatedWpId);
+              if (wp) {
+                const line = window.L.polyline([[wp.lat, wp.lon], [cont.lat, cont.lon]], {
+                  color: cont.isActive ? '#10b981' : '#f59e0b',
+                  weight: cont.isActive ? 4 : 2,
+                  dashArray: cont.isActive ? '' : '6, 6',
+                  opacity: cont.isActive ? 1.0 : 0.6
+                }).addTo(map);
+                refugeLinesRef.current.push(line);
+              }
+            }
+          }
+        });
+
+      }, [activeWaypoints, pois, contingencies, isNightMode]);
+
+      // Theming Classes
+      const theme = {
+        bg: isNightMode ? 'bg-black' : 'bg-slate-100',
+        text: isNightMode ? 'text-red-500' : 'text-slate-800',
+        textMuted: isNightMode ? 'text-red-700' : 'text-slate-500',
+        card: isNightMode ? 'bg-zinc-950 border border-red-900 shadow-none' : 'bg-white border border-slate-200 shadow-sm',
+        input: isNightMode ? 'bg-zinc-900 border-red-900 text-red-500 focus:border-red-500' : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-blue-500',
+        dangerCard: isNightMode ? 'bg-red-950/30 border-red-800' : 'bg-red-50 border-red-200',
+        btnPrimary: isNightMode ? 'bg-red-900 text-black hover:bg-red-800' : 'bg-blue-600 text-white hover:bg-blue-700',
+        btnWpActive: isNightMode ? 'bg-red-600 text-black shadow-lg shadow-red-900' : 'bg-green-600 text-white shadow-lg shadow-green-200',
+        btnPoiActive: isNightMode ? 'bg-amber-600 text-black shadow-lg shadow-amber-900' : 'bg-amber-500 text-white shadow-lg shadow-amber-200',
+        btnRefugeActive: isNightMode ? 'bg-emerald-800 text-black shadow-lg shadow-emerald-900' : 'bg-emerald-500 text-white shadow-lg shadow-emerald-200',
+        divider: isNightMode ? 'border-red-900/50' : 'border-slate-200',
+        dragActive: isNightMode ? 'bg-red-900/20 border-red-500 border-dashed' : 'bg-blue-50/50 border-blue-400 border-dashed'
+      };
+
+      // Reusable Collapsible Wrapper
+      const CollapsibleSection = ({ title, icon, children, className, defaultOpen = true, extraHeader }) => {
+          const [isOpen, setIsOpen] = useState(defaultOpen);
+          return (
+            <section className={`p-4 sm:p-5 rounded-xl ${className}`}>
+               <div className="flex flex-wrap items-center justify-between gap-3 mb-4 select-none cursor-pointer" onClick={(e) => {
+                   if(e.target.closest('button') || e.target.closest('select') || e.target.closest('input')) return;
+                   setIsOpen(!isOpen);
+               }}>
+                 <div className="flex items-center space-x-2">
+                   {icon}
+                   <h2 className="text-lg font-bold">{title}</h2>
+                 </div>
+                 <div className="flex items-center space-x-3">
+                   {extraHeader}
+                   <button className={`opacity-50 hover:opacity-100 p-1`}>
+                     {isOpen ? <i className="fa-solid fa-chevron-up"></i> : <i className="fa-solid fa-chevron-down"></i>}
+                   </button>
+                 </div>
+               </div>
+               {isOpen && <div className="space-y-4">{children}</div>}
+            </section>
+          );
+      };
+
+      return (
+        <div className={`min-h-screen p-2 md:p-6 transition-colors duration-300 ${theme.bg} ${theme.text} font-sans`}>
+          <datalist id="lights-list">
+            <option value="Fl.(4)W. 30s" /> <option value="Fl.R. 5s" /> <option value="Q.G." /> <option value="Iso.4s" />
+          </datalist>
+
+          {/* Top Navigation Bar & Trip Name */}
+          <div className={`max-w-7xl mx-auto flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6 p-4 rounded-xl ${theme.card}`}>
+            
+            <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
+              <div className="flex items-center space-x-3">
+                <i className="fa-solid fa-compass text-3xl"></i>
+                <input
+                   type="text"
+                   value={tripName}
+                   onChange={e => setTripName(e.target.value)}
+                   className={`text-xl sm:text-2xl font-bold tracking-tight bg-transparent border-b-2 border-transparent focus:border-blue-400 outline-none w-full sm:w-64 pb-0.5`}
+                   placeholder="Enter Trip Name..."
+                />
+              </div>
+              
+              <div className="w-px h-6 bg-slate-300 dark:bg-slate-700 hidden sm:block mx-1"></div>
+              
+              <div className="flex items-center space-x-2">
+                <button 
+                  onClick={saveHTML}
+                  className={`flex items-center space-x-2 text-sm font-bold px-3 py-1.5 rounded border transition-colors ${isNightMode ? 'border-red-900 bg-red-950/30 hover:bg-red-900' : 'border-slate-300 bg-white hover:bg-blue-50 hover:text-blue-600'}`}
+                  title="Save changes directly to a downloadable HTML file"
+                >
+                  <i className="fa-solid fa-floppy-disk"></i>
+                  <span className="hidden sm:inline">Save HTML</span>
+                </button>
+
+                <button 
+                  onClick={handleExportMarkdown}
+                  className={`flex items-center space-x-2 text-sm font-bold px-3 py-1.5 rounded border transition-colors ${isNightMode ? 'border-amber-900 bg-amber-950/30 text-amber-500 hover:bg-amber-900' : 'border-slate-300 bg-white hover:bg-amber-50 hover:text-amber-600'}`}
+                  title="Export to Markdown for Obsidian"
+                >
+                  <i className="fa-brands fa-markdown text-lg"></i>
+                  <span className="hidden sm:inline">Export MD</span>
+                </button>
+              </div>
+
+              {saveStatus && <span className="text-emerald-500 text-sm font-bold animate-pulse hidden lg:inline">{saveStatus}</span>}
+            </div>
+
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <span className="text-sm font-semibold">Time:</span>
+                <button onClick={() => setTimeMode(timeMode === 'LT' ? 'UT' : 'LT')} className={`px-3 py-1 rounded font-mono text-sm font-bold border ${theme.input}`}>
+                  {timeMode}
+                </button>
+              </div>
+              <button onClick={() => setIsNightMode(!isNightMode)} className={`p-2 rounded-full border ${isNightMode ? 'border-red-500 bg-red-950/50' : 'border-slate-300 bg-slate-100'}`}>
+                {isNightMode ? <i className="fa-solid fa-moon"></i> : <i className="fa-solid fa-sun"></i>}
+              </button>
+            </div>
+          </div>
+
+          <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            {/* LEFT COLUMN: Appraisal & Context */}
+            <div className="lg:col-span-4 space-y-6">
+              
+              <CollapsibleSection title="Vessel & Crew" icon={<i className="fa-solid fa-ship text-lg"></i>} className={theme.card} defaultOpen={true}>
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div><label className={`block text-xs uppercase mb-1 ${theme.textMuted}`}>Draft (m)</label><input type="number" step="0.1" value={vessel.draft} onChange={e => setVessel({...vessel, draft: parseFloat(e.target.value)})} className={`w-full p-2 rounded text-sm border ${theme.input}`} /></div>
+                  <div><label className={`block text-xs uppercase mb-1 ${theme.textMuted}`}>Boat Spd (kts)</label><input type="number" step="0.1" value={vessel.speed} onChange={e => setVessel({...vessel, speed: parseFloat(e.target.value)})} className={`w-full p-2 rounded text-sm border ${theme.input}`} /></div>
+                </div>
+                <div><label className={`block text-xs uppercase mb-1 ${theme.textMuted}`}>Crew Vault (Private)</label><textarea value={vessel.crewNotes} onChange={e => setVessel({...vessel, crewNotes: e.target.value})} className={`w-full p-2 rounded text-sm border h-16 ${theme.input}`} /></div>
+              </CollapsibleSection>
+
+              <CollapsibleSection 
+                title="Weather Matrix" 
+                icon={<i className="fa-solid fa-temperature-half text-lg"></i>} 
+                className={isWeatherStale ? theme.dangerCard : theme.card}
+                defaultOpen={true}
+                extraHeader={isWeatherStale && <div className="flex items-center space-x-1 text-red-600 animate-pulse"><i className="fa-solid fa-triangle-exclamation"></i><span className="text-xs font-bold uppercase hidden sm:inline">Stale Data</span></div>}
+              >
+                <div className="space-y-3">
+                  <div><label className={`block text-xs uppercase mb-1 flex justify-between ${theme.textMuted}`}><span>Forecast Issue Time</span></label>
+                    <input type="datetime-local" value={weather.issueTime} onChange={e => setWeather({...weather, issueTime: e.target.value})} className={`w-full p-2 rounded text-sm border ${theme.input}`} />
+                  </div>
+                </div>
+              </CollapsibleSection>
+
+              <CollapsibleSection title="Contingencies & Abort Plans" icon={<i className="fa-solid fa-anchor text-amber-500 text-lg"></i>} className={`border-l-4 border-l-amber-500 ${theme.card}`} defaultOpen={true}>
+                 <div className="space-y-4">
+                   {contingencies.map((cont, idx) => (
+                      <div key={cont.id} className={`p-3 border rounded-lg ${cont.isActive ? (isNightMode ? 'border-emerald-800 bg-emerald-950/20' : 'border-emerald-400 bg-emerald-50') : theme.divider}`}>
+                         <div className="flex justify-between items-center mb-3 border-b pb-2">
+                            <span className="text-xs font-bold uppercase flex items-center">
+                              <i className="fa-solid fa-life-ring mr-1 text-amber-500"></i> Plan {String.fromCharCode(66 + idx)}
+                            </span>
+                            <div className="flex space-x-2">
+                              <button 
+                                onClick={() => updateContingency(cont.id, 'isActive', !cont.isActive)}
+                                className={`flex items-center px-2 py-1 text-[10px] uppercase font-bold rounded border transition-colors ${cont.isActive ? 'bg-emerald-500 text-white border-emerald-600' : (isNightMode ? 'bg-zinc-800 text-slate-300 border-zinc-700' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100')}`}
+                              >
+                                {cont.isActive ? <><i className="fa-solid fa-circle-check mr-1"></i> Active Plan</> : <><i className="fa-regular fa-circle mr-1"></i> Make Active</>}
+                              </button>
+                              <button onClick={() => removeContingency(cont.id)} className="opacity-50 hover:opacity-100 hover:text-red-500"><i className="fa-solid fa-trash"></i></button>
+                            </div>
+                         </div>
+
+                         <div className="grid grid-cols-1 gap-3">
+                            <div className="flex gap-2">
+                              <div className="flex-1">
+                                 <label className={`block text-[10px] uppercase ${theme.textMuted}`}>Port of Refuge Name</label>
+                                 <input type="text" value={cont.name} onChange={e => updateContingency(cont.id, 'name', e.target.value)} className={`w-full p-1.5 rounded text-sm border ${theme.input}`} />
+                              </div>
+                              <div className="w-8 flex items-end pb-1">or</div>
+                              <div className="flex-1">
+                                 <label className={`block text-[10px] uppercase ${theme.textMuted}`}>Standard DB</label>
+                                 <select onChange={(e) => applyStandardPort(cont.id, e.target.value)} className={`w-full p-1.5 rounded text-[11px] border ${theme.input}`}>
+                                    <option value="">- Select -</option>
+                                    {standardPortsDB.map(g => (
+                                      <optgroup label={g.group} key={g.group}>
+                                        {g.ports.map(p => <option value={p.name} key={p.name}>{p.name}</option>)}
+                                      </optgroup>
+                                    ))}
+                                 </select>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                               <div>
+                                 <label className={`block text-[10px] uppercase ${theme.textMuted}`}>Lat</label>
+                                 <input type="number" step="0.000001" value={cont.lat} onChange={e => updateContingency(cont.id, 'lat', parseFloat(e.target.value))} className={`w-full p-1.5 rounded text-xs border font-mono ${theme.input}`} />
+                               </div>
+                               <div>
+                                 <label className={`block text-[10px] uppercase ${theme.textMuted}`}>Lon</label>
+                                 <input type="number" step="0.000001" value={cont.lon} onChange={e => updateContingency(cont.id, 'lon', parseFloat(e.target.value))} className={`w-full p-1.5 rounded text-xs border font-mono ${theme.input}`} />
+                               </div>
+                               <div>
+                                 <label className={`block text-[10px] uppercase ${theme.textMuted}`}>Related WP</label>
+                                 <select value={cont.relatedWpId || ''} onChange={e => updateContingency(cont.id, 'relatedWpId', e.target.value ? Number(e.target.value) : '')} className={`w-full p-1.5 rounded text-[11px] border ${theme.input}`}>
+                                    <option value="">- None -</option>
+                                    {activeWaypoints.map(w => <option key={w.id} value={w.id}>{w.name || `WP ${w.id}`}</option>)}
+                                 </select>
+                               </div>
+                            </div>
+                            <div>
+                              <label className={`block text-[10px] uppercase ${theme.textMuted}`}>Abort Condition / Turn-Back Point</label>
+                              <input type="text" value={cont.abortPoint} onChange={e => updateContingency(cont.id, 'abortPoint', e.target.value)} placeholder="e.g. If wind shifts to N before WP2" className={`w-full p-1.5 rounded text-sm border ${theme.input}`} />
+                            </div>
+                            {cont.isActive && (
+                               <div className={`mt-2 p-2 rounded border-l-2 border-emerald-500 ${isNightMode ? 'bg-black' : 'bg-white'}`}>
+                                 <label className={`block text-[10px] uppercase font-bold text-emerald-600 mb-1`}>Detailed Refuge Plan</label>
+                                 <textarea 
+                                   value={cont.details} 
+                                   onChange={e => updateContingency(cont.id, 'details', e.target.value)} 
+                                   rows="3" 
+                                   placeholder="Enter pilotage details, VHF channels, depth restrictions..."
+                                   className={`w-full p-2 rounded text-xs border ${theme.input}`}
+                                 ></textarea>
+                               </div>
+                            )}
+                         </div>
+                      </div>
+                   ))}
+                   <button onClick={addContingency} className={`w-full py-2 rounded flex items-center justify-center space-x-2 text-sm font-bold transition-colors bg-transparent border border-dashed hover:bg-black/5 ${theme.divider} ${theme.textMuted}`}>
+                    <i className="fa-solid fa-plus"></i><span>Add Contingency Block</span>
+                   </button>
+                 </div>
+              </CollapsibleSection>
+            </div>
+
+            {/* RIGHT COLUMN: Execution & Navigation Table */}
+            <div className="lg:col-span-8 space-y-6">
+              
+              {/* Scenario Summary Panel */}
+              <div className="grid grid-cols-3 gap-3">
+                 {['A', 'B', 'C'].map(sc => {
+                    const wps = waypoints.filter(w => w.scenario === sc);
+                    let dist = 0;
+                    for(let i=0; i<wps.length-1; i++) {
+                       dist += parseFloat(calculateNav(wps[i], wps[i+1]).distance);
+                    }
+                    const isActive = activeScenario === sc;
+                    return (
+                       <div 
+                          key={sc} 
+                          onClick={() => setActiveScenario(sc)} 
+                          className={`p-3 sm:p-4 rounded-xl border cursor-pointer transition-all ${isActive ? (isNightMode ? 'bg-red-900/40 border-red-500 shadow-md shadow-red-900/50' : 'bg-blue-50 border-blue-500 shadow-md shadow-blue-500/20') : theme.card} hover:shadow-md`}
+                       >
+                          <div className="text-xs sm:text-sm font-bold uppercase text-slate-500 mb-2 flex justify-between items-center">
+                             <span className={isActive ? (isNightMode ? 'text-red-400' : 'text-blue-600') : theme.textMuted}>Plan {sc}</span>
+                             {isActive && <i className="fa-solid fa-circle-check text-lg text-blue-500 dark:text-red-500"></i>}
+                          </div>
+                          <div className="text-lg sm:text-xl font-bold">{wps.length} <span className="text-[10px] sm:text-xs font-normal opacity-70">WPs</span></div>
+                          <div className="text-md sm:text-lg font-mono">{dist.toFixed(1)} <span className="text-[10px] sm:text-xs font-sans font-normal opacity-70">NM</span></div>
+                       </div>
+                    )
+                 })}
+              </div>
+
+              {/* Interactive Chart Area (Kept strictly visible to prevent Leaflet resize bugs) */}
+              <section className={`p-5 rounded-xl ${theme.card}`}>
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                  <div className="flex items-center space-x-2">
+                    <i className="fa-solid fa-map text-lg"></i>
+                    <h2 className="text-lg font-bold">Interactive Nautical Chart</h2>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-2">
+                    <button onClick={() => setShowDepth(!showDepth)} className={`px-3 py-1.5 rounded flex items-center space-x-2 text-xs font-bold transition-all border ${showDepth ? (isNightMode ? 'bg-zinc-800 border-red-700 text-red-400' : 'bg-blue-100 border-blue-300 text-blue-700') : theme.input}`}>
+                      <i className="fa-solid fa-water"></i>
+                      <span>{showDepth ? 'Depth On' : 'Depth Off'}</span>
+                    </button>
+                    <button onClick={() => setIsSatellite(!isSatellite)} className={`px-3 py-1.5 rounded flex items-center space-x-2 text-xs font-bold transition-all border ${isSatellite ? (isNightMode ? 'bg-zinc-800 border-red-700 text-red-400' : 'bg-slate-800 border-slate-900 text-white') : theme.input}`}>
+                      <i className="fa-solid fa-layer-group"></i>
+                      <span>{isSatellite ? 'Sat Mode' : 'Standard Map'}</span>
+                    </button>
+                    <div className="w-px h-8 bg-slate-300 mx-1 hidden sm:block"></div>
+                    <button onClick={() => togglePlotMode('wp')} className={`px-3 py-1.5 rounded flex items-center space-x-1.5 text-xs font-bold transition-all ${plotMode === 'wp' ? theme.btnWpActive : theme.btnPrimary}`}>
+                      {plotMode === 'wp' ? <i className="fa-solid fa-crosshairs animate-pulse"></i> : <i className="fa-solid fa-location-dot"></i>}
+                      <span className="hidden sm:inline">{plotMode === 'wp' ? 'Plotting...' : 'Plot WP'}</span>
+                    </button>
+                    <button onClick={() => togglePlotMode('poi')} className={`px-3 py-1.5 rounded flex items-center space-x-1.5 text-xs font-bold transition-all ${plotMode === 'poi' ? theme.btnPoiActive : theme.btnPrimary}`}>
+                      {plotMode === 'poi' ? <i className="fa-solid fa-crosshairs animate-pulse"></i> : <i className="fa-solid fa-flag"></i>}
+                      <span className="hidden sm:inline">{plotMode === 'poi' ? 'Plotting...' : 'Plot POI'}</span>
+                    </button>
+                    <button onClick={() => togglePlotMode('refuge')} className={`px-3 py-1.5 rounded flex items-center space-x-1.5 text-xs font-bold transition-all ${plotMode === 'refuge' ? theme.btnRefugeActive : theme.btnPrimary}`}>
+                      {plotMode === 'refuge' ? <i className="fa-solid fa-crosshairs animate-pulse"></i> : <i className="fa-solid fa-life-ring"></i>}
+                      <span className="hidden sm:inline">{plotMode === 'refuge' ? 'Plotting...' : 'Plot Refuge'}</span>
+                    </button>
+                  </div>
+                </div>
+                
+                {plotMode !== 'off' && (
+                   <div className={`mb-3 p-2 text-sm font-bold text-center rounded ${plotMode === 'wp' ? (isNightMode ? 'bg-red-900/20 text-red-400' : 'bg-green-50 text-green-700') : (plotMode === 'poi' ? 'bg-amber-500/20 text-amber-700' : 'bg-emerald-500/20 text-emerald-700')}`}>
+                     Click anywhere on the chart grid below to drop a new {plotMode === 'wp' ? `Waypoint (Scenario ${activeScenario})` : (plotMode === 'poi' ? 'Point of Interest' : 'Port of Refuge Contingency')}.
+                   </div>
+                )}
+
+                <div className={`relative w-full aspect-[2/1] min-h-[400px] rounded-lg border overflow-hidden bg-slate-800 ${plotMode !== 'off' ? 'map-plotting-mode ring-2 ring-current' : ''} ${isNightMode ? 'map-night-mode' : ''} ${theme.divider}`}>
+                   <div ref={mapRef} className="absolute inset-0 z-0"></div>
+                </div>
+                <div className={`text-right text-[10px] mt-2 opacity-60 font-mono ${theme.textMuted}`}>Overlays: OpenSeaMap (marks) {showDepth && '+ EMODnet (depth contours)'}</div>
+              </section>
+
+              {/* Map Quick Zoom - Now underneath the Chart */}
+              <CollapsibleSection title="Map Quick Zoom" icon={<i className="fa-solid fa-magnifying-glass text-lg"></i>} className={theme.card} defaultOpen={false}>
+                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                    {activeWaypoints.length > 0 && (
+                       <div>
+                          <h3 className={`text-[10px] font-bold uppercase ${theme.textMuted} mb-1 border-b pb-1 ${theme.divider}`}>Waypoints (Plan {activeScenario})</h3>
+                          <div className="max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                            {activeWaypoints.map((wp, idx) => (
+                               <div key={wp.id} onClick={() => handleZoomTo(wp.lat, wp.lon)} className="cursor-pointer text-sm hover:text-blue-500 py-1 transition-colors flex items-center">
+                                  <span className="font-mono text-[10px] mr-2 text-slate-400 bg-black/5 px-1 rounded">{String(idx+1).padStart(2, '0')}</span> 
+                                  {wp.name || `WP ${wp.id}`}
+                               </div>
+                            ))}
+                          </div>
+                       </div>
+                    )}
+                    {contingencies.length > 0 && (
+                       <div>
+                          <h3 className={`text-[10px] font-bold uppercase ${theme.textMuted} mb-1 border-b pb-1 ${theme.divider}`}>Ports of Refuge</h3>
+                          <div className="max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                            {contingencies.map((c, idx) => (
+                               <div key={c.id} onClick={() => handleZoomTo(c.lat, c.lon)} className="cursor-pointer text-sm hover:text-emerald-600 py-1 transition-colors flex items-center">
+                                  <span className="font-mono text-[10px] mr-2 text-amber-500 bg-amber-500/10 px-1 rounded font-bold">Plan {String.fromCharCode(66+idx)}</span> 
+                                  {c.name || `Refuge ${c.id}`}
+                               </div>
+                            ))}
+                          </div>
+                       </div>
+                    )}
+                    {pois.length > 0 && (
+                       <div>
+                          <h3 className={`text-[10px] font-bold uppercase ${theme.textMuted} mb-1 border-b pb-1 ${theme.divider}`}>Points of Interest</h3>
+                          <div className="max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                            {pois.map(p => (
+                               <div key={p.id} onClick={() => handleZoomTo(p.lat, p.lon)} className="cursor-pointer text-sm hover:text-amber-500 py-1 transition-colors flex items-center">
+                                  <span className="font-mono text-[10px] mr-2 text-slate-400 bg-black/5 px-1 rounded">{p.type.charAt(0)}</span> 
+                                  {p.name}
+                               </div>
+                            ))}
+                          </div>
+                       </div>
+                    )}
+                 </div>
+              </CollapsibleSection>
+
+              {/* Points of Interest (POI) Database */}
+              <CollapsibleSection title="Points of Interest Database" icon={<i className="fa-solid fa-circle-info text-lg"></i>} className={theme.card} defaultOpen={false}>
+                  <div className="space-y-3">
+                     {pois.length === 0 && <div className="text-sm italic opacity-50">No POIs logged.</div>}
+                     {pois.map((poi, idx) => (
+                        <div key={poi.id} className={`p-3 border rounded-lg flex flex-col sm:flex-row gap-3 ${theme.divider}`}>
+                           <div className="flex items-center justify-center w-8 h-8 rounded bg-amber-500/20 text-amber-600 font-bold shrink-0">{poi.type.charAt(0)}</div>
+                           <div className="flex-1 grid grid-cols-1 sm:grid-cols-12 gap-3">
+                              <div className="sm:col-span-3">
+                                <label className={`block text-[10px] uppercase ${theme.textMuted}`}>Name / Suggested</label>
+                                <input type="text" value={poi.name} onChange={e => updatePoi(poi.id, 'name', e.target.value)} className={`w-full p-1.5 rounded text-sm border ${theme.input}`} />
+                              </div>
+                              <div className="sm:col-span-2">
+                                <label className={`block text-[10px] uppercase ${theme.textMuted}`}>Type</label>
+                                <select value={poi.type} onChange={e => updatePoi(poi.id, 'type', e.target.value)} className={`w-full p-1.5 rounded text-sm border ${theme.input}`}>
+                                   <option value="Light">Light</option>
+                                   <option value="Mark">Mark</option>
+                                   <option value="Other">Other</option>
+                                </select>
+                              </div>
+                              <div className="sm:col-span-3">
+                                 <label className={`block text-[10px] uppercase flex items-center ${theme.textMuted}`}><i className="fa-solid fa-link mr-1"></i> Related WP</label>
+                                 <select value={poi.relatedWpId || ''} onChange={e => updatePoi(poi.id, 'relatedWpId', e.target.value ? Number(e.target.value) : '')} className={`w-full p-1.5 rounded text-sm border ${theme.input}`}>
+                                    <option value="">- None -</option>
+                                    {activeWaypoints.map(w => <option key={w.id} value={w.id}>{w.name || `WP ${w.id}`}</option>)}
+                                 </select>
+                              </div>
+                              <div className="sm:col-span-2 grid grid-cols-2 sm:grid-cols-1 gap-2">
+                                 <div>
+                                   <label className={`block text-[10px] uppercase ${theme.textMuted}`}>Lat</label>
+                                   <input type="number" step="0.000001" value={poi.lat} onChange={e => updatePoi(poi.id, 'lat', parseFloat(e.target.value))} className={`w-full p-1.5 rounded text-sm border font-mono ${theme.input}`} />
+                                 </div>
+                                 <div>
+                                   <label className={`block text-[10px] uppercase ${theme.textMuted}`}>Lon</label>
+                                   <input type="number" step="0.000001" value={poi.lon} onChange={e => updatePoi(poi.id, 'lon', parseFloat(e.target.value))} className={`w-full p-1.5 rounded text-sm border font-mono ${theme.input}`} />
+                                 </div>
+                              </div>
+                              <div className="sm:col-span-5">
+                                 <label className={`block text-[10px] uppercase ${theme.textMuted}`}>Details</label>
+                                 <textarea value={poi.details} onChange={e => updatePoi(poi.id, 'details', e.target.value)} rows="2" className={`w-full p-1.5 rounded text-xs border ${theme.input}`}></textarea>
+                              </div>
+                              <div className="sm:col-span-1 flex items-center justify-end">
+                                 <button onClick={() => removePoi(poi.id)} className="opacity-50 hover:opacity-100 hover:text-red-500 p-2"><i className="fa-solid fa-trash"></i></button>
+                              </div>
+                           </div>
+                        </div>
+                     ))}
+                  </div>
+              </CollapsibleSection>
+
+              {/* The Nav Table */}
+              <CollapsibleSection 
+                title="Technical Nav-Table" 
+                icon={<i className="fa-solid fa-location-dot text-lg"></i>} 
+                className={`${theme.card} overflow-x-auto`} 
+                defaultOpen={true}
+                extraHeader={
+                  <div className="flex items-center space-x-2">
+                     <label className={`text-[10px] sm:text-xs font-bold uppercase ${theme.textMuted}`}>Scenario:</label>
+                     <select 
+                        value={activeScenario} 
+                        onChange={e => setActiveScenario(e.target.value)} 
+                        className={`p-1 sm:p-1.5 font-bold text-sm sm:text-base rounded border bg-blue-50/50 ${theme.input}`}
+                     >
+                        {scenarioOptions.map(opt => <option key={opt} value={opt}>Plan {opt}</option>)}
+                     </select>
+                  </div>
+                }
+              >
+                <div className="min-w-[800px]">
+                  {activeWaypoints.length === 0 && (
+                     <div className="p-8 text-center text-sm font-bold opacity-50 border border-dashed rounded-lg">
+                        No waypoints in Scenario {activeScenario}. Click "Plot WP" to add some!
+                     </div>
+                  )}
+                  {activeWaypoints.map((wp, index) => {
+                    const nextWp = activeWaypoints[index + 1];
+                    let navData = nextWp ? calculateNav(wp, nextWp) : null;
+                    const isDraftWarning = wp.depth < (vessel.draft + 1.0);
+                    
+                    const relatedPois = pois.filter(p => p.relatedWpId === wp.id);
+                    const relatedContingencies = contingencies.filter(c => c.relatedWpId === wp.id);
+
+                    return (
+                      <div 
+                        key={wp.id} 
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, index)}
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDrop(e, index)}
+                        onDragEnter={(e) => handleDragEnter(e, index)}
+                        className={`mb-4 border rounded-lg overflow-visible transition-all duration-200 ${dragOverIndex === index ? theme.dragActive : (isDraftWarning ? 'border-red-500 shadow-md shadow-red-500/20' : theme.divider)}`}
+                      >
+                        <div className={`p-3 flex justify-between items-center ${isDraftWarning ? 'bg-red-500/10' : 'bg-black/5'}`}>
+                          <div className="flex items-center space-x-3">
+                            <div className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 mr-1"><i className="fa-solid fa-grip-vertical text-lg"></i></div>
+                            <span className={`font-bold w-7 h-7 rounded-full flex items-center justify-center text-xs ${isNightMode ? 'bg-red-900 text-black' : 'bg-slate-800 text-white'}`}>
+                               {String(index + 1).padStart(2, '0')}
+                            </span>
+                            <input type="text" value={wp.name} onChange={e => updateWaypoint(wp.id, 'name', e.target.value)} placeholder="WP Name" className={`font-bold bg-transparent border-b border-transparent focus:border-current outline-none w-48`} />
+                            {isDraftWarning && <span className="flex items-center text-red-500 text-xs font-bold px-2 py-1 rounded bg-red-500/20"><i className="fa-solid fa-shield-halved mr-1"></i> Draft Warning</span>}
+                          </div>
+                          <button onClick={() => removeWaypoint(wp.id)} className="opacity-50 hover:opacity-100 hover:text-red-500"><i className="fa-solid fa-trash"></i></button>
+                        </div>
+
+                        <div className="p-3 grid grid-cols-6 gap-3">
+                          <div className="col-span-2 grid grid-cols-2 gap-2">
+                            <div><label className={`block text-[10px] uppercase ${theme.textMuted}`}>Lat</label><input type="number" step="0.000001" value={wp.lat} onChange={e => updateWaypoint(wp.id, 'lat', parseFloat(e.target.value))} className={`w-full p-1.5 rounded text-sm border font-mono ${theme.input}`} /></div>
+                            <div><label className={`block text-[10px] uppercase ${theme.textMuted}`}>Lon</label><input type="number" step="0.000001" value={wp.lon} onChange={e => updateWaypoint(wp.id, 'lon', parseFloat(e.target.value))} className={`w-full p-1.5 rounded text-sm border font-mono ${theme.input}`} /></div>
+                          </div>
+                          <div><label className={`block text-[10px] uppercase ${theme.textMuted}`}>Depth(m)</label><input type="number" step="0.1" value={wp.depth} onChange={e => updateWaypoint(wp.id, 'depth', parseFloat(e.target.value))} className={`w-full p-1.5 rounded text-sm border ${isDraftWarning ? 'bg-red-500/20 text-red-600 font-bold border-red-500' : theme.input}`} /></div>
+                          <div className="col-span-3 grid grid-cols-2 gap-2">
+                            <div><label className={`block text-[10px] uppercase ${theme.textMuted}`}>Visual / Light</label><input list="lights-list" value={wp.lightChar} onChange={e => updateWaypoint(wp.id, 'lightChar', e.target.value)} placeholder="e.g. Fl(2)10s" className={`w-full p-1.5 rounded text-sm border ${theme.input}`} /></div>
+                            <div><label className={`block text-[10px] uppercase ${theme.textMuted}`}>Notes</label><input type="text" value={wp.notes} onChange={e => updateWaypoint(wp.id, 'notes', e.target.value)} className={`w-full p-1.5 rounded text-sm border ${theme.input}`} /></div>
+                          </div>
+                        </div>
+
+                        {(relatedPois.length > 0 || relatedContingencies.length > 0) && (
+                           <div className={`px-3 py-2 flex flex-wrap gap-2 items-center border-t ${isNightMode ? 'bg-red-950/20 border-red-900/50' : 'bg-slate-50/80 border-slate-200'}`}>
+                              
+                              {relatedPois.length > 0 && (
+                                <div className="flex items-center space-x-2 mr-4">
+                                  <span className={`text-[10px] uppercase font-bold flex items-center ${theme.textMuted}`}><i className="fa-solid fa-circle-info mr-1"></i> POIs:</span>
+                                  {relatedPois.map(poi => (
+                                     <div key={poi.id} className="group relative">
+                                        <span className={`cursor-help px-2 py-1 rounded text-xs font-bold border ${isNightMode ? 'bg-zinc-900 border-amber-900 text-amber-500' : 'bg-white border-amber-200 text-amber-700'}`}>
+                                           [{poi.type}] {poi.name}
+                                        </span>
+                                        <div className={`hidden group-hover:block absolute z-50 p-3 text-xs rounded shadow-xl w-64 -top-1 left-full ml-2 border ${isNightMode ? 'bg-zinc-900 border-amber-900 text-amber-400' : 'bg-white border-amber-200 text-slate-800'}`}>
+                                           <div className="font-bold border-b pb-1 mb-1 border-current opacity-50">{poi.name} ({poi.type})</div>
+                                           <div>{poi.details || <span className="italic opacity-50">No details provided.</span>}</div>
+                                           <div className="text-[9px] mt-2 opacity-50 font-mono">Lat: {poi.lat.toFixed(6)} / Lon: {poi.lon.toFixed(6)}</div>
+                                        </div>
+                                     </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {relatedContingencies.length > 0 && (
+                                 <div className="flex items-center space-x-2">
+                                    <span className={`text-[10px] uppercase font-bold flex items-center ${theme.textMuted}`}><i className="fa-solid fa-anchor mr-1"></i> Escapes:</span>
+                                    {relatedContingencies.map(cont => {
+                                       const cIdx = contingencies.findIndex(c => c.id === cont.id);
+                                       const pLetter = String.fromCharCode(66 + cIdx);
+                                       return (
+                                         <div key={cont.id} className="group relative">
+                                            <span className={`cursor-help px-2 py-1 rounded text-xs font-bold border flex items-center ${cont.isActive ? 'bg-emerald-500 border-emerald-600 text-white' : (isNightMode ? 'bg-zinc-900 border-emerald-900 text-emerald-500' : 'bg-white border-emerald-200 text-emerald-700')}`}>
+                                               {cont.isActive && <i className="fa-solid fa-circle-check mr-1"></i>} Plan {pLetter}: {cont.name || 'Refuge'}
+                                            </span>
+                                            <div className={`hidden group-hover:block absolute z-50 p-3 text-xs rounded shadow-xl w-64 -top-1 left-full ml-2 border ${isNightMode ? 'bg-zinc-900 border-emerald-900 text-emerald-400' : 'bg-white border-emerald-200 text-slate-800'}`}>
+                                               <div className="font-bold border-b pb-1 mb-1 border-current opacity-50">Plan {pLetter}: {cont.name}</div>
+                                               <div className="font-bold text-[10px] uppercase mt-1">Abort Point/Condition:</div>
+                                               <div className="mb-2 text-amber-600">{cont.abortPoint || <span className="italic opacity-50">None set.</span>}</div>
+                                               <div className="font-bold text-[10px] uppercase">Refuge Plan:</div>
+                                               <div>{cont.details || <span className="italic opacity-50">No details provided.</span>}</div>
+                                            </div>
+                                         </div>
+                                       )
+                                    })}
+                                 </div>
+                              )}
+                           </div>
+                        )}
+
+                        {navData && (
+                          <div className={`p-3 border-t flex flex-wrap items-center justify-between gap-4 ${isNightMode ? 'bg-black border-red-900/50' : 'bg-slate-50 border-slate-200'}`}>
+                            <div className="flex items-center space-x-6">
+                              <div className="flex flex-col"><span className={`text-[10px] uppercase font-bold ${theme.textMuted}`}>Distance</span><span className="font-mono font-bold text-lg">{navData.distance} <span className="text-xs font-normal">NM</span></span></div>
+                              <div className="flex flex-col"><span className={`text-[10px] uppercase font-bold ${theme.textMuted}`}>Bearing (COG)</span><span className="font-mono font-bold text-lg">{navData.bearing}° <span className="text-xs font-normal">T</span></span></div>
+                              
+                              <div className="flex space-x-2 bg-black/5 p-1 rounded border border-transparent hover:border-slate-300">
+                                <div className="flex flex-col w-16"><span className={`text-[9px] uppercase ${theme.textMuted}`}>Tide Set(°T)</span><input type="number" value={wp.tideSet} onChange={e => updateWaypoint(wp.id, 'tideSet', e.target.value)} className={`p-1 rounded text-xs font-mono border ${theme.input}`} /></div>
+                                <div className="flex flex-col w-16"><span className={`text-[9px] uppercase ${theme.textMuted}`}>Tide Rate(kt)</span><input type="number" step="0.1" value={wp.tideRate} onChange={e => updateWaypoint(wp.id, 'tideRate', e.target.value)} className={`p-1 rounded text-xs font-mono border ${theme.input}`} /></div>
+                              </div>
+
+                              <div className="flex flex-col bg-blue-600/10 px-3 py-1 rounded border border-blue-500/30">
+                                <span className={`text-[10px] uppercase font-bold text-blue-600 ${isNightMode ? 'text-blue-400' : ''}`}>Course To Steer (CTS)</span>
+                                <span className={`font-mono font-bold text-xl text-blue-700 ${isNightMode ? 'text-blue-400' : ''}`}>{navData.cts}° <span className="text-xs font-normal">T</span></span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </CollapsibleSection>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

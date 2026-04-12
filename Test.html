@@ -1,0 +1,1466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PlotrPlan Pro</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- Leaflet CSS & JS --><style>*, ::before, ::after{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }::backdrop{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-pan-x: ;--tw-pan-y: ;--tw-pinch-zoom: ;--tw-scroll-snap-strictness:proximity;--tw-gradient-from-position: ;--tw-gradient-via-position: ;--tw-gradient-to-position: ;--tw-ordinal: ;--tw-slashed-zero: ;--tw-numeric-figure: ;--tw-numeric-spacing: ;--tw-numeric-fraction: ;--tw-ring-inset: ;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgb(59 130 246 / 0.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;--tw-blur: ;--tw-brightness: ;--tw-contrast: ;--tw-grayscale: ;--tw-hue-rotate: ;--tw-invert: ;--tw-saturate: ;--tw-sepia: ;--tw-drop-shadow: ;--tw-backdrop-blur: ;--tw-backdrop-brightness: ;--tw-backdrop-contrast: ;--tw-backdrop-grayscale: ;--tw-backdrop-hue-rotate: ;--tw-backdrop-invert: ;--tw-backdrop-opacity: ;--tw-backdrop-saturate: ;--tw-backdrop-sepia: ;--tw-contain-size: ;--tw-contain-layout: ;--tw-contain-paint: ;--tw-contain-style: }/* ! tailwindcss v3.4.17 | MIT License | https://tailwindcss.com */*,::after,::before{box-sizing:border-box;border-width:0;border-style:solid;border-color:#e5e7eb}::after,::before{--tw-content:''}:host,html{line-height:1.5;-webkit-text-size-adjust:100%;-moz-tab-size:4;tab-size:4;font-family:ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";font-feature-settings:normal;font-variation-settings:normal;-webkit-tap-highlight-color:transparent}body{margin:0;line-height:inherit}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,pre,samp{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;font-feature-settings:normal;font-variation-settings:normal;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}button,input,optgroup,select,textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;letter-spacing:inherit;color:inherit;margin:0;padding:0}button,select{text-transform:none}button,input:where([type=button]),input:where([type=reset]),input:where([type=submit]){-webkit-appearance:button;background-color:transparent;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}progress{vertical-align:baseline}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}summary{display:list-item}blockquote,dd,dl,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset{margin:0;padding:0}legend{padding:0}menu,ol,ul{list-style:none;margin:0;padding:0}dialog{padding:0}textarea{resize:vertical}input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}[role=button],button{cursor:pointer}:disabled{cursor:default}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{max-width:100%;height:auto}[hidden]:where(:not([hidden=until-found])){display:none}.absolute{position:absolute}.relative{position:relative}.inset-0{inset:0px}.-top-1{top:-0.25rem}.left-full{left:100%}.z-0{z-index:0}.z-50{z-index:50}.col-span-2{grid-column:span 2 / span 2}.col-span-3{grid-column:span 3 / span 3}.mx-1{margin-left:0.25rem;margin-right:0.25rem}.mx-auto{margin-left:auto;margin-right:auto}.mb-1{margin-bottom:0.25rem}.mb-2{margin-bottom:0.5rem}.mb-3{margin-bottom:0.75rem}.mb-4{margin-bottom:1rem}.mb-6{margin-bottom:1.5rem}.ml-2{margin-left:0.5rem}.mr-1{margin-right:0.25rem}.mr-4{margin-right:1rem}.mt-1{margin-top:0.25rem}.mt-2{margin-top:0.5rem}.mr-2{margin-right:0.5rem}.mb-1\.5{margin-bottom:0.375rem}.mr-1\.5{margin-right:0.375rem}.mb-10{margin-bottom:2.5rem}.ml-1{margin-left:0.25rem}.mt-10{margin-top:2.5rem}.mt-12{margin-top:3rem}.mt-8{margin-top:2rem}.block{display:block}.flex{display:flex}.grid{display:grid}.hidden{display:none}.aspect-\[2\/1\]{aspect-ratio:2/1}.h-16{height:4rem}.h-6{height:1.5rem}.h-7{height:1.75rem}.h-8{height:2rem}.max-h-64{max-height:16rem}.min-h-\[400px\]{min-height:400px}.min-h-screen{min-height:100vh}.w-16{width:4rem}.w-48{width:12rem}.w-64{width:16rem}.w-7{width:1.75rem}.w-8{width:2rem}.w-full{width:100%}.w-px{width:1px}.w-20{width:5rem}.w-32{width:8rem}.min-w-\[800px\]{min-width:800px}.max-w-7xl{max-width:80rem}.max-w-5xl{max-width:64rem}.flex-1{flex:1 1 0%}.shrink-0{flex-shrink:0}.border-collapse{border-collapse:collapse}@keyframes pulse{50%{opacity:.5}}.animate-pulse{animation:pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite}.cursor-grab{cursor:grab}.cursor-help{cursor:help}.cursor-pointer{cursor:pointer}.select-none{-webkit-user-select:none;user-select:none}.grid-cols-1{grid-template-columns:repeat(1, minmax(0, 1fr))}.grid-cols-2{grid-template-columns:repeat(2, minmax(0, 1fr))}.grid-cols-3{grid-template-columns:repeat(3, minmax(0, 1fr))}.grid-cols-6{grid-template-columns:repeat(6, minmax(0, 1fr))}.flex-col{flex-direction:column}.flex-wrap{flex-wrap:wrap}.items-end{align-items:flex-end}.items-center{align-items:center}.justify-end{justify-content:flex-end}.justify-center{justify-content:center}.justify-between{justify-content:space-between}.gap-2{gap:0.5rem}.gap-3{gap:0.75rem}.gap-4{gap:1rem}.gap-6{gap:1.5rem}.gap-8{gap:2rem}.space-x-1\.5 > :not([hidden]) ~ :not([hidden]){--tw-space-x-reverse:0;margin-right:calc(0.375rem * var(--tw-space-x-reverse));margin-left:calc(0.375rem * calc(1 - var(--tw-space-x-reverse)))}.space-x-2 > :not([hidden]) ~ :not([hidden]){--tw-space-x-reverse:0;margin-right:calc(0.5rem * var(--tw-space-x-reverse));margin-left:calc(0.5rem * calc(1 - var(--tw-space-x-reverse)))}.space-x-3 > :not([hidden]) ~ :not([hidden]){--tw-space-x-reverse:0;margin-right:calc(0.75rem * var(--tw-space-x-reverse));margin-left:calc(0.75rem * calc(1 - var(--tw-space-x-reverse)))}.space-x-4 > :not([hidden]) ~ :not([hidden]){--tw-space-x-reverse:0;margin-right:calc(1rem * var(--tw-space-x-reverse));margin-left:calc(1rem * calc(1 - var(--tw-space-x-reverse)))}.space-x-6 > :not([hidden]) ~ :not([hidden]){--tw-space-x-reverse:0;margin-right:calc(1.5rem * var(--tw-space-x-reverse));margin-left:calc(1.5rem * calc(1 - var(--tw-space-x-reverse)))}.space-y-3 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.75rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.75rem * var(--tw-space-y-reverse))}.space-y-4 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1rem * var(--tw-space-y-reverse))}.space-y-6 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(1.5rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(1.5rem * var(--tw-space-y-reverse))}.space-y-2 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0.5rem * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0.5rem * var(--tw-space-y-reverse))}.overflow-hidden{overflow:hidden}.overflow-visible{overflow:visible}.overflow-x-auto{overflow-x:auto}.overflow-y-auto{overflow-y:auto}.whitespace-pre-line{white-space:pre-line}.rounded{border-radius:0.25rem}.rounded-full{border-radius:9999px}.rounded-lg{border-radius:0.5rem}.rounded-xl{border-radius:0.75rem}.border{border-width:1px}.border-0{border-width:0px}.border-b{border-bottom-width:1px}.border-b-2{border-bottom-width:2px}.border-l-2{border-left-width:2px}.border-l-4{border-left-width:4px}.border-t{border-top-width:1px}.border-dashed{border-style:dashed}.border-amber-200{--tw-border-opacity:1;border-color:rgb(253 230 138 / var(--tw-border-opacity, 1))}.border-blue-300{--tw-border-opacity:1;border-color:rgb(147 197 253 / var(--tw-border-opacity, 1))}.border-blue-500{--tw-border-opacity:1;border-color:rgb(59 130 246 / var(--tw-border-opacity, 1))}.border-blue-500\/30{border-color:rgb(59 130 246 / 0.3)}.border-current{border-color:currentColor}.border-emerald-200{--tw-border-opacity:1;border-color:rgb(167 243 208 / var(--tw-border-opacity, 1))}.border-emerald-400{--tw-border-opacity:1;border-color:rgb(52 211 153 / var(--tw-border-opacity, 1))}.border-emerald-500{--tw-border-opacity:1;border-color:rgb(16 185 129 / var(--tw-border-opacity, 1))}.border-emerald-600{--tw-border-opacity:1;border-color:rgb(5 150 105 / var(--tw-border-opacity, 1))}.border-slate-200{--tw-border-opacity:1;border-color:rgb(226 232 240 / var(--tw-border-opacity, 1))}.border-slate-300{--tw-border-opacity:1;border-color:rgb(203 213 225 / var(--tw-border-opacity, 1))}.border-transparent{border-color:transparent}.border-slate-900{--tw-border-opacity:1;border-color:rgb(15 23 42 / var(--tw-border-opacity, 1))}.border-black{--tw-border-opacity:1;border-color:rgb(0 0 0 / var(--tw-border-opacity, 1))}.border-gray-200{--tw-border-opacity:1;border-color:rgb(229 231 235 / var(--tw-border-opacity, 1))}.border-gray-300{--tw-border-opacity:1;border-color:rgb(209 213 219 / var(--tw-border-opacity, 1))}.border-l-amber-500{--tw-border-opacity:1;border-left-color:rgb(245 158 11 / var(--tw-border-opacity, 1))}.bg-black\/5{background-color:rgb(0 0 0 / 0.05)}.bg-blue-100{--tw-bg-opacity:1;background-color:rgb(219 234 254 / var(--tw-bg-opacity, 1))}.bg-blue-50{--tw-bg-opacity:1;background-color:rgb(239 246 255 / var(--tw-bg-opacity, 1))}.bg-blue-50\/50{background-color:rgb(239 246 255 / 0.5)}.bg-blue-600{--tw-bg-opacity:1;background-color:rgb(37 99 235 / var(--tw-bg-opacity, 1))}.bg-blue-600\/10{background-color:rgb(37 99 235 / 0.1)}.bg-emerald-50{--tw-bg-opacity:1;background-color:rgb(236 253 245 / var(--tw-bg-opacity, 1))}.bg-emerald-500{--tw-bg-opacity:1;background-color:rgb(16 185 129 / var(--tw-bg-opacity, 1))}.bg-slate-100{--tw-bg-opacity:1;background-color:rgb(241 245 249 / var(--tw-bg-opacity, 1))}.bg-slate-300{--tw-bg-opacity:1;background-color:rgb(203 213 225 / var(--tw-bg-opacity, 1))}.bg-slate-50{--tw-bg-opacity:1;background-color:rgb(248 250 252 / var(--tw-bg-opacity, 1))}.bg-slate-50\/80{background-color:rgb(248 250 252 / 0.8)}.bg-slate-800{--tw-bg-opacity:1;background-color:rgb(30 41 59 / var(--tw-bg-opacity, 1))}.bg-transparent{background-color:transparent}.bg-white{--tw-bg-opacity:1;background-color:rgb(255 255 255 / var(--tw-bg-opacity, 1))}.bg-white\/90{background-color:rgb(255 255 255 / 0.9)}.bg-amber-500\/20{background-color:rgb(245 158 11 / 0.2)}.bg-amber-500\/10{background-color:rgb(245 158 11 / 0.1)}.bg-green-50{--tw-bg-opacity:1;background-color:rgb(240 253 244 / var(--tw-bg-opacity, 1))}.bg-green-600{--tw-bg-opacity:1;background-color:rgb(22 163 74 / var(--tw-bg-opacity, 1))}.bg-amber-500{--tw-bg-opacity:1;background-color:rgb(245 158 11 / var(--tw-bg-opacity, 1))}.bg-emerald-500\/20{background-color:rgb(16 185 129 / 0.2)}.bg-gray-100{--tw-bg-opacity:1;background-color:rgb(243 244 246 / var(--tw-bg-opacity, 1))}.bg-gray-50{--tw-bg-opacity:1;background-color:rgb(249 250 251 / var(--tw-bg-opacity, 1))}.p-1{padding:0.25rem}.p-1\.5{padding:0.375rem}.p-2{padding:0.5rem}.p-3{padding:0.75rem}.p-4{padding:1rem}.p-5{padding:1.25rem}.p-8{padding:2rem}.px-2{padding-left:0.5rem;padding-right:0.5rem}.px-3{padding-left:0.75rem;padding-right:0.75rem}.py-1{padding-top:0.25rem;padding-bottom:0.25rem}.py-1\.5{padding-top:0.375rem;padding-bottom:0.375rem}.py-2{padding-top:0.5rem;padding-bottom:0.5rem}.px-1{padding-left:0.25rem;padding-right:0.25rem}.px-6{padding-left:1.5rem;padding-right:1.5rem}.pb-0\.5{padding-bottom:0.125rem}.pb-1{padding-bottom:0.25rem}.pb-2{padding-bottom:0.5rem}.pr-2{padding-right:0.5rem}.pl-3{padding-left:0.75rem}.pt-4{padding-top:1rem}.text-left{text-align:left}.text-center{text-align:center}.text-right{text-align:right}.font-mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}.font-sans{font-family:ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"}.text-3xl{font-size:1.875rem;line-height:2.25rem}.text-\[10px\]{font-size:10px}.text-\[11px\]{font-size:11px}.text-\[9px\]{font-size:9px}.text-lg{font-size:1.125rem;line-height:1.75rem}.text-sm{font-size:0.875rem;line-height:1.25rem}.text-xl{font-size:1.25rem;line-height:1.75rem}.text-xs{font-size:0.75rem;line-height:1rem}.text-\[8px\]{font-size:8px}.text-4xl{font-size:2.25rem;line-height:2.5rem}.font-bold{font-weight:700}.font-normal{font-weight:400}.font-semibold{font-weight:600}.uppercase{text-transform:uppercase}.italic{font-style:italic}.tracking-tight{letter-spacing:-0.025em}.tracking-wide{letter-spacing:0.025em}.tracking-wider{letter-spacing:0.05em}.tracking-widest{letter-spacing:0.1em}.text-amber-500{--tw-text-opacity:1;color:rgb(245 158 11 / var(--tw-text-opacity, 1))}.text-amber-600{--tw-text-opacity:1;color:rgb(217 119 6 / var(--tw-text-opacity, 1))}.text-amber-700{--tw-text-opacity:1;color:rgb(180 83 9 / var(--tw-text-opacity, 1))}.text-blue-500{--tw-text-opacity:1;color:rgb(59 130 246 / var(--tw-text-opacity, 1))}.text-blue-600{--tw-text-opacity:1;color:rgb(37 99 235 / var(--tw-text-opacity, 1))}.text-blue-700{--tw-text-opacity:1;color:rgb(29 78 216 / var(--tw-text-opacity, 1))}.text-emerald-600{--tw-text-opacity:1;color:rgb(5 150 105 / var(--tw-text-opacity, 1))}.text-slate-400{--tw-text-opacity:1;color:rgb(148 163 184 / var(--tw-text-opacity, 1))}.text-slate-500{--tw-text-opacity:1;color:rgb(100 116 139 / var(--tw-text-opacity, 1))}.text-slate-800{--tw-text-opacity:1;color:rgb(30 41 59 / var(--tw-text-opacity, 1))}.text-slate-900{--tw-text-opacity:1;color:rgb(15 23 42 / var(--tw-text-opacity, 1))}.text-white{--tw-text-opacity:1;color:rgb(255 255 255 / var(--tw-text-opacity, 1))}.text-green-700{--tw-text-opacity:1;color:rgb(21 128 61 / var(--tw-text-opacity, 1))}.text-slate-600{--tw-text-opacity:1;color:rgb(71 85 105 / var(--tw-text-opacity, 1))}.text-emerald-700{--tw-text-opacity:1;color:rgb(4 120 87 / var(--tw-text-opacity, 1))}.text-emerald-500{--tw-text-opacity:1;color:rgb(16 185 129 / var(--tw-text-opacity, 1))}.text-black{--tw-text-opacity:1;color:rgb(0 0 0 / var(--tw-text-opacity, 1))}.text-gray-400{--tw-text-opacity:1;color:rgb(156 163 175 / var(--tw-text-opacity, 1))}.text-gray-500{--tw-text-opacity:1;color:rgb(107 114 128 / var(--tw-text-opacity, 1))}.text-gray-600{--tw-text-opacity:1;color:rgb(75 85 99 / var(--tw-text-opacity, 1))}.opacity-50{opacity:0.5}.opacity-60{opacity:0.6}.opacity-70{opacity:0.7}.opacity-80{opacity:0.8}.opacity-75{opacity:0.75}.shadow-md{--tw-shadow:0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);--tw-shadow-colored:0 4px 6px -1px var(--tw-shadow-color), 0 2px 4px -2px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.shadow-sm{--tw-shadow:0 1px 2px 0 rgb(0 0 0 / 0.05);--tw-shadow-colored:0 1px 2px 0 var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.shadow-xl{--tw-shadow:0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);--tw-shadow-colored:0 20px 25px -5px var(--tw-shadow-color), 0 8px 10px -6px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.shadow-lg{--tw-shadow:0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);--tw-shadow-colored:0 10px 15px -3px var(--tw-shadow-color), 0 4px 6px -4px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.shadow-blue-500\/20{--tw-shadow-color:rgb(59 130 246 / 0.2);--tw-shadow:var(--tw-shadow-colored)}.shadow-green-200{--tw-shadow-color:#bbf7d0;--tw-shadow:var(--tw-shadow-colored)}.shadow-amber-200{--tw-shadow-color:#fde68a;--tw-shadow:var(--tw-shadow-colored)}.shadow-emerald-200{--tw-shadow-color:#a7f3d0;--tw-shadow:var(--tw-shadow-colored)}.outline-none{outline:2px solid transparent;outline-offset:2px}.ring-2{--tw-ring-offset-shadow:var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);--tw-ring-shadow:var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);box-shadow:var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000)}.ring-current{--tw-ring-color:currentColor}.backdrop-blur-sm{--tw-backdrop-blur:blur(4px);-webkit-backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia);backdrop-filter:var(--tw-backdrop-blur) var(--tw-backdrop-brightness) var(--tw-backdrop-contrast) var(--tw-backdrop-grayscale) var(--tw-backdrop-hue-rotate) var(--tw-backdrop-invert) var(--tw-backdrop-opacity) var(--tw-backdrop-saturate) var(--tw-backdrop-sepia)}.transition-all{transition-property:all;transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);transition-duration:150ms}.transition-colors{transition-property:color, background-color, border-color, fill, stroke, -webkit-text-decoration-color;transition-property:color, background-color, border-color, text-decoration-color, fill, stroke;transition-property:color, background-color, border-color, text-decoration-color, fill, stroke, -webkit-text-decoration-color;transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);transition-duration:150ms}.transition-transform{transition-property:transform;transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);transition-duration:150ms}.duration-200{transition-duration:200ms}.duration-300{transition-duration:300ms}.even\:bg-gray-50:nth-child(even){--tw-bg-opacity:1;background-color:rgb(249 250 251 / var(--tw-bg-opacity, 1))}.hover\:border-slate-300:hover{--tw-border-opacity:1;border-color:rgb(203 213 225 / var(--tw-border-opacity, 1))}.hover\:border-blue-500:hover{--tw-border-opacity:1;border-color:rgb(59 130 246 / var(--tw-border-opacity, 1))}.hover\:bg-amber-50:hover{--tw-bg-opacity:1;background-color:rgb(255 251 235 / var(--tw-bg-opacity, 1))}.hover\:bg-black\/5:hover{background-color:rgb(0 0 0 / 0.05)}.hover\:bg-blue-50:hover{--tw-bg-opacity:1;background-color:rgb(239 246 255 / var(--tw-bg-opacity, 1))}.hover\:bg-blue-700:hover{--tw-bg-opacity:1;background-color:rgb(29 78 216 / var(--tw-bg-opacity, 1))}.hover\:bg-purple-50:hover{--tw-bg-opacity:1;background-color:rgb(250 245 255 / var(--tw-bg-opacity, 1))}.hover\:bg-red-50:hover{--tw-bg-opacity:1;background-color:rgb(254 242 242 / var(--tw-bg-opacity, 1))}.hover\:bg-slate-100:hover{--tw-bg-opacity:1;background-color:rgb(241 245 249 / var(--tw-bg-opacity, 1))}.hover\:bg-slate-700:hover{--tw-bg-opacity:1;background-color:rgb(51 65 85 / var(--tw-bg-opacity, 1))}.hover\:text-amber-600:hover{--tw-text-opacity:1;color:rgb(217 119 6 / var(--tw-text-opacity, 1))}.hover\:text-blue-600:hover{--tw-text-opacity:1;color:rgb(37 99 235 / var(--tw-text-opacity, 1))}.hover\:text-purple-600:hover{--tw-text-opacity:1;color:rgb(147 51 234 / var(--tw-text-opacity, 1))}.hover\:text-red-500:hover{--tw-text-opacity:1;color:rgb(239 68 68 / var(--tw-text-opacity, 1))}.hover\:text-red-600:hover{--tw-text-opacity:1;color:rgb(220 38 38 / var(--tw-text-opacity, 1))}.hover\:text-slate-600:hover{--tw-text-opacity:1;color:rgb(71 85 105 / var(--tw-text-opacity, 1))}.hover\:text-emerald-600:hover{--tw-text-opacity:1;color:rgb(5 150 105 / var(--tw-text-opacity, 1))}.hover\:text-blue-500:hover{--tw-text-opacity:1;color:rgb(59 130 246 / var(--tw-text-opacity, 1))}.hover\:text-amber-500:hover{--tw-text-opacity:1;color:rgb(245 158 11 / var(--tw-text-opacity, 1))}.hover\:opacity-100:hover{opacity:1}.hover\:shadow-md:hover{--tw-shadow:0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);--tw-shadow-colored:0 4px 6px -1px var(--tw-shadow-color), 0 2px 4px -2px var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow)}.focus\:border-blue-400:focus{--tw-border-opacity:1;border-color:rgb(96 165 250 / var(--tw-border-opacity, 1))}.focus\:border-blue-500:focus{--tw-border-opacity:1;border-color:rgb(59 130 246 / var(--tw-border-opacity, 1))}.focus\:border-current:focus{border-color:currentColor}.active\:cursor-grabbing:active{cursor:grabbing}.group[open] .group-open\:rotate-180{--tw-rotate:180deg;transform:translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}.group:hover .group-hover\:block{display:block}@media (min-width: 640px){.sm\:col-span-1{grid-column:span 1 / span 1}.sm\:col-span-2{grid-column:span 2 / span 2}.sm\:col-span-3{grid-column:span 3 / span 3}.sm\:col-span-5{grid-column:span 5 / span 5}.sm\:block{display:block}.sm\:inline{display:inline}.sm\:w-64{width:16rem}.sm\:grid-cols-1{grid-template-columns:repeat(1, minmax(0, 1fr))}.sm\:grid-cols-12{grid-template-columns:repeat(12, minmax(0, 1fr))}.sm\:grid-cols-3{grid-template-columns:repeat(3, minmax(0, 1fr))}.sm\:flex-row{flex-direction:row}.sm\:items-center{align-items:center}.sm\:space-x-4 > :not([hidden]) ~ :not([hidden]){--tw-space-x-reverse:0;margin-right:calc(1rem * var(--tw-space-x-reverse));margin-left:calc(1rem * calc(1 - var(--tw-space-x-reverse)))}.sm\:space-y-0 > :not([hidden]) ~ :not([hidden]){--tw-space-y-reverse:0;margin-top:calc(0px * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(0px * var(--tw-space-y-reverse))}.sm\:p-1\.5{padding:0.375rem}.sm\:p-4{padding:1rem}.sm\:p-5{padding:1.25rem}.sm\:text-2xl{font-size:1.5rem;line-height:2rem}.sm\:text-base{font-size:1rem;line-height:1.5rem}.sm\:text-lg{font-size:1.125rem;line-height:1.75rem}.sm\:text-sm{font-size:0.875rem;line-height:1.25rem}.sm\:text-xl{font-size:1.25rem;line-height:1.75rem}.sm\:text-xs{font-size:0.75rem;line-height:1rem}}@media (min-width: 768px){.md\:flex-row{flex-direction:row}.md\:items-center{align-items:center}.md\:p-6{padding:1.5rem}}@media (min-width: 1024px){.lg\:col-span-4{grid-column:span 4 / span 4}.lg\:col-span-8{grid-column:span 8 / span 8}.lg\:inline{display:inline}.lg\:grid-cols-12{grid-template-columns:repeat(12, minmax(0, 1fr))}}@media (min-width: 1280px){.xl\:inline{display:inline}}@media (prefers-color-scheme: dark){.dark\:bg-slate-700{--tw-bg-opacity:1;background-color:rgb(51 65 85 / var(--tw-bg-opacity, 1))}.dark\:text-red-500{--tw-text-opacity:1;color:rgb(239 68 68 / var(--tw-text-opacity, 1))}}@media print{.print\:hidden{display:none}}</style></head><body class="">å
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- React & ReactDOM -->
+  <script crossorigin="" src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin="" src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <!-- Babel for in-browser JSX compilation -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    .map-plotting-mode .leaflet-interactive, .map-plotting-mode .leaflet-container { cursor: crosshair !important; }
+    .map-night-mode .leaflet-tile-pane { filter: grayscale(100%) sepia(100%) hue-rotate(315deg) brightness(0.6) contrast(1.5); }
+    .leaflet-control-container { z-index: 10; }
+    .leaflet-tooltip { border-radius: 8px !important; }
+    .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    details > summary { list-style: none; }
+    details > summary::-webkit-details-marker { display: none; }
+  </style>
+
+  <!-- Embedded Saved State -->
+  <script id="plotr-state" type="application/json">{"tripName":"26W15 Dagje Loosdrecht ","isNightMode":false,"timeMode":"LT","activeScenario":"A","vessel":{"name":"SV Seabird","mmsi":"235123456","draft":1,"airDraft":14.5,"speed":3,"crewNotes":"Jur en Pieter\nWind uit het zuiden. \n15-25 kts\n10-16 graden\nKans op regen"},"weather":{"source":"KNMI / Marifoon","issueTime":"2026-04-11T04:17","wind":"SW 15-20 kts (Bft 5)","visibility":"Good","seaState":"Moderate"},"waypoints":[{"id":1,"scenario":"A","name":"WP 1: Vertrek haven","lat":52.206002,"lon":5.075071,"depth":5,"tideSet":0,"tideRate":0,"lightChar":"","notes":""},{"id":2,"scenario":"A","name":"WP 2: Peddelen of Fok","lat":52.205863,"lon":5.075844,"depth":5,"tideSet":0,"tideRate":0,"lightChar":"","notes":""},{"id":3,"scenario":"A","name":"WP 3: Optuigen","lat":52.205408,"lon":5.075881,"depth":5,"tideSet":0,"tideRate":0,"lightChar":"","notes":""},{"id":4,"scenario":"A","name":"WP 4: Heenweg kruisen","lat":52.202372,"lon":5.066573,"depth":5,"tideSet":0,"tideRate":0,"lightChar":"","notes":""},{"id":5,"scenario":"A","name":"WP 5","lat":52.196686,"lon":5.083303,"depth":5,"tideSet":0,"tideRate":0,"lightChar":"","notes":""},{"id":6,"scenario":"A","name":"WP 6","lat":52.192263,"lon":5.04847,"depth":5,"tideSet":0,"tideRate":0,"lightChar":"","notes":""},{"id":7,"scenario":"A","name":"WP 7","lat":52.185734,"lon":5.064857,"depth":5,"tideSet":0,"tideRate":0,"lightChar":"","notes":""},{"id":8,"scenario":"A","name":"WP 8","lat":52.178356,"lon":5.052551,"depth":5,"tideSet":0,"tideRate":0,"lightChar":"","notes":""},{"id":9,"scenario":"A","name":"WP 9: Lunch","lat":52.176498,"lon":5.056061,"depth":5,"tideSet":0,"tideRate":0,"lightChar":"","notes":""},{"id":10,"scenario":"A","name":"WP 10","lat":52.180849,"lon":5.062021,"depth":5,"tideSet":0,"tideRate":0,"lightChar":"","notes":""},{"id":11,"scenario":"A","name":"WP 11","lat":52.188354,"lon":5.048036,"depth":5,"tideSet":0,"tideRate":0,"lightChar":"","notes":""},{"id":12,"scenario":"A","name":"WP 12","lat":52.203282,"lon":5.081067,"depth":5,"tideSet":0,"tideRate":0,"lightChar":"","notes":""},{"id":13,"scenario":"A","name":"WP 13","lat":52.205104,"lon":5.075976,"depth":5,"tideSet":0,"tideRate":0,"lightChar":"","notes":""},{"id":14,"scenario":"A","name":"WP 14","lat":52.20533,"lon":5.076624,"depth":5,"tideSet":0,"tideRate":0,"lightChar":"","notes":""},{"id":15,"scenario":"A","name":"WP 15: Aftuigen","lat":52.205405,"lon":5.076189,"depth":5,"tideSet":0,"tideRate":0,"lightChar":"","notes":""}],"pois":[{"id":1,"name":"Boei 4 na wp4","type":"Mark","details":"Nummer 4, geen licht.","lat":52.200002,"lon":5.070764,"relatedWpId":4},{"id":2,"name":"Boei 2 voor WP4","type":"Mark","details":"Nummer 2 geen licht. \n","lat":52.204398,"lon":5.077027,"relatedWpId":4},{"id":3,"name":"Boei 8 bij WP 5","type":"Mark","details":"","lat":52.196907,"lon":5.083436,"relatedWpId":5},{"id":4,"name":"Boei 5 na WP 5","type":"Mark","details":"","lat":52.19624,"lon":5.076056,"relatedWpId":5},{"id":5,"name":"Boei 12 bij WP6","type":"Mark","details":"","lat":52.191556,"lon":5.047178,"relatedWpId":6},{"id":6,"name":"Boei 16 bij WP7","type":"Mark","details":"","lat":52.185863,"lon":5.064522,"relatedWpId":7},{"id":7,"name":"Lunch Locatie","type":"Other","details":"","lat":52.176456,"lon":5.055532,"relatedWpId":9}],"contingencies":[{"id":1,"name":"Refuge voor heenweg: Robinson Crusoe eiland","lat":52.197348,"lon":5.076206,"relatedWpId":5,"abortPoint":"Dit is wel aan lagerwal","details":"","isActive":false},{"id":2,"name":"Alternatieve lunch locatie","lat":52.187005,"lon":5.060271,"relatedWpId":7,"abortPoint":"","details":"","isActive":false},{"id":3,"name":"Veilige haven meer naar zuiden","lat":52.192934,"lon":5.076335,"relatedWpId":5,"abortPoint":"","details":"","isActive":false},{"id":4,"name":"Terugweg refuge 1","lat":52.186931,"lon":5.060318,"relatedWpId":11,"abortPoint":"","details":"","isActive":false},{"id":5,"name":"Terugweg refuge 2","lat":52.193083,"lon":5.07541,"relatedWpId":12,"abortPoint":"","details":"","isActive":false}]}</script>
+
+
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    // Standard Ports Database
+    const standardPortsDB = [
+      { 
+        group: 'IJSSELMEER (Directe toegang)', 
+        ports: [
+          { name: 'Hindeloopen', lat: 52.943000, lon: 5.398000 },
+          { name: 'Workum', lat: 52.978000, lon: 5.435000 },
+          { name: 'Stavoren', lat: 52.886000, lon: 5.358000 },
+          { name: 'Enkhuizen', lat: 52.705000, lon: 5.298000 },
+          { name: 'Medemblik', lat: 52.772000, lon: 5.115000 },
+        ]
+      },
+      { 
+        group: 'WADDENZEE (Via Lorentzsluizen)', 
+        ports: [
+          { name: 'Harlingen', lat: 53.175000, lon: 5.412000 },
+          { name: 'Terschelling (West)', lat: 53.360000, lon: 5.215000 },
+          { name: 'Vlieland', lat: 53.296000, lon: 5.090000 },
+          { name: 'Texel (Oudeschild)', lat: 53.039000, lon: 4.850000 },
+        ]
+      }
+    ];
+
+    // Maritime Quick Links Database
+    const quickLinksDB = [
+      {
+        category: "General / Global Tools",
+        groups: [
+          { name: "Primary Navigation & Routing (Pre-Departure)", links: [ { label: "PredictWind", url: "https://forecast.predictwind.com/" }, { label: "Navionics", url: "https://webapp.navionics.com/" }, { label: "Savvy Navvy", url: "https://www.savvy-navvy.com/" } ] },
+          { name: "Situational Awareness (AIS)", links: [ { label: "MarineTraffic", url: "https://www.marinetraffic.com/" }, { label: "VesselFinder", url: "https://www.vesselfinder.com/" } ] },
+          { name: "Local Knowledge & Mooring", links: [ { label: "Navily", url: "https://www.navily.com/" }, { label: "Noonsite", url: "https://www.noonsite.com/" } ] },
+          { name: "Global Overlays (Tactical)", links: [ { label: "OpenSeaMap", url: "https://map.openseamap.org/" }, { label: "Windy", url: "https://www.windy.com/" }, { label: "DeepZoom", url: "https://www.deepzoom.com/" } ] },
+          { name: "Safety & Tech", links: [ { label: "Anchor Pro", url: "https://play.google.com/store/apps/details?id=com.solono.anchorpro" }, { label: "OpenCPN", url: "https://opencpn.org/" } ] }
+        ]
+      },
+      {
+        category: "Netherlands (NL)",
+        groups: [
+          { name: "Emergency & VHF (Tactical)", text: "VHF 16: Int. Distress\nVHF 67: Kustwacht (Coastguard)\nVHF 00: KNRM\nVHF 31: Marinas\nVHF 18/20/22: Bridges/Locks", links: [{label: "KNRM Helpt App", url: "https://www.knrm.nl/helpt"}] },
+          { name: "Weather, Waves & Tides", links: [ { label: "KNMI Marine Forecast", url: "https://www.knmi.nl/nederland-nu/maritiem" }, { label: "Rijkswaterstaat Waterinfo", url: "https://waterinfo.rws.nl/" }, { label: "RWS OS (Stroming, Getijden, Golven)", url: "https://waterinfo.rws.nl/" } ] },
+          { name: "Local Pilot Knowledge", links: [ { label: "Vaarweginformatie.nl", url: "https://vaarweginformatie.nl/" }, { label: "Varen doe je Samen!", url: "https://varendoejesamen.nl/" } ] }
+        ]
+      },
+      {
+        category: "Greece (GR)",
+        groups: [
+          { name: "Emergency & VHF (Tactical)", text: "VHF 16: Hellenic Coast Guard\nVHF 12: Port Authorities (Limenarcheio)\nOlympia Radio Weather: VHF 01, 02, 04, 27" },
+          { name: "Weather & Waves", links: [ { label: "Poseidon System (HCMR)", url: "https://poseidon.hcmr.gr/" } ] },
+          { name: "Local Pilot Knowledge & Tides", links: [ { label: "Hellenic Navy Hydrographic Srv", url: "https://www.hnhs.gr/" }, { label: "RCC Pilotage - Greece", url: "https://rccpf.org.uk/" } ] }
+        ]
+      },
+      {
+        category: "North Sea",
+        groups: [
+          { name: "Emergency & VHF (Tactical)", text: "UK: VHF 16 / 67 / 80\nNorway: VHF 16 / 20-22, 60-66\nDenmark: VHF 16 (H+33)\nFrance: VHF 16 / 06, 08, 72", links: [{label: "SafeTrx App", url: "https://www.safetrxapp.com/"}] },
+          { name: "Weather (Wind & Waves)", links: [ { label: "Met Office Shipping", url: "https://www.metoffice.gov.uk/weather/specialist-forecasts/coast-and-sea" }, { label: "Yr.no (Marine)", url: "https://www.yr.no/en/map" }, { label: "DMI Marine", url: "https://www.dmi.dk/hav/" }, { label: "Météo-France Marine", url: "https://meteofrance.com/meteo-marine" } ] },
+          { name: "Tides & Pilotage", links: [ { label: "Kartverket (Norway)", url: "https://www.kartverket.no/en" }, { label: "Admiralty EasyTide (UK)", url: "https://easytide.admiralty.co.uk/" }, { label: "RCC Passage Notes", url: "https://rccpf.org.uk/" }, { label: "Visit My Harbour", url: "https://www.visitmyharbour.com/" } ] }
+        ]
+      }
+    ];
+
+    const defaultWaypoints = [
+      { id: 1, scenario: 'A', name: 'Terschelling Marina', lat: 53.361000, lon: 5.218000, depth: 3.5, tideSet: 0, tideRate: 0, lightChar: 'Oc.G.6s', notes: 'Depart 2h before HW Harlingen. Call Brandaris VHF 2' },
+      { id: 2, scenario: 'A', name: 'Schuitengat / Slenk', lat: 53.350000, lon: 5.175000, depth: 4.2, tideSet: 220, tideRate: 1.5, lightChar: 'Fl.R.4s', notes: 'Strong cross currents, keep strictly to buoyage' },
+      { id: 3, scenario: 'A', name: 'Vliestroom North', lat: 53.285000, lon: 5.100000, depth: 12.0, tideSet: 210, tideRate: 2.1, lightChar: 'Iso.8s', notes: 'Stay mid-channel. Watch for ferries to Vlieland.' },
+      { id: 4, scenario: 'A', name: 'Inschot', lat: 53.210000, lon: 5.050000, depth: 6.5, tideSet: 200, tideRate: 1.8, lightChar: 'Q.R', notes: 'Narrowing channel, stick to red side.' },
+      { id: 5, scenario: 'A', name: 'Texelstroom', lat: 53.125000, lon: 4.930000, depth: 15.0, tideSet: 215, tideRate: 2.5, lightChar: 'Fl(3)G.10s', notes: 'Heavy commercial traffic & strong tidal streams.' },
+      { id: 6, scenario: 'A', name: 'Oudeschild Approach', lat: 53.045000, lon: 4.865000, depth: 5.0, tideSet: 190, tideRate: 1.0, lightChar: 'Iso.R.4s', notes: 'Prepare lines and fenders. Call HM VHF 31' },
+      { id: 7, scenario: 'A', name: 'Oudeschild Marina', lat: 53.039000, lon: 4.850000, depth: 3.0, tideSet: 0, tideRate: 0, lightChar: '', notes: 'Mooring inside. Watch for local fishing fleet.' }
+    ];
+
+    const defaultPois = [
+      { id: 1, name: 'Vlieland Ferry Crossing', type: 'Other', details: 'High-speed ferries cross here frequently.', lat: 53.295000, lon: 5.115000, relatedWpId: 3 },
+      { id: 2, name: 'Richel Sandbank', type: 'Mark', details: 'Extensive drying bank, seal resting area.', lat: 53.290000, lon: 5.140000, relatedWpId: 3 }
+    ];
+
+    const defaultContingencies = [
+      { 
+        id: 1, 
+        name: 'Vlieland Marina', 
+        lat: 53.296000, 
+        lon: 5.090000, 
+        relatedWpId: 3, 
+        abortPoint: 'If weather deteriorates in Vliestroom', 
+        details: 'Entrance tricky in strong cross-tide. Call HM on VHF 12. Depth 2.5m.', 
+        isActive: true 
+      }
+    ];
+
+    // Reusable Collapsible Wrapper (Moved outside App to prevent re-mounting and focus loss on keystrokes)
+    const CollapsibleSection = ({ title, icon, children, className, defaultOpen = true, extraHeader }) => {
+        const [isOpen, setIsOpen] = useState(defaultOpen);
+        return (
+          <section className={`p-4 sm:p-5 rounded-xl ${className}`}>
+             <div className="flex flex-wrap items-center justify-between gap-3 mb-4 select-none cursor-pointer" onClick={(e) => {
+                 if(e.target.closest('button') || e.target.closest('select') || e.target.closest('input') || e.target.closest('textarea')) return;
+                 setIsOpen(!isOpen);
+             }}>
+               <div className="flex items-center space-x-2">
+                 {icon}
+                 <h2 className="text-lg font-bold">{title}</h2>
+               </div>
+               <div className="flex items-center space-x-3">
+                 {extraHeader}
+                 <button className={`opacity-50 hover:opacity-100 p-1`}>
+                   {isOpen ? <i className="fa-solid fa-chevron-up"></i> : <i className="fa-solid fa-chevron-down"></i>}
+                 </button>
+               </div>
+             </div>
+             {isOpen && <div className="space-y-4">{children}</div>}
+          </section>
+        );
+    };
+
+    function App() {
+      // Load Embedded State
+      const initialState = useMemo(() => {
+         try {
+            const stateEl = document.getElementById('plotr-state');
+            if (stateEl && stateEl.textContent) {
+               return JSON.parse(stateEl.textContent);
+            }
+         } catch(e) { console.error("Error loading saved state", e); }
+         return null;
+      }, []);
+
+      // Global State
+      const [tripName, setTripName] = useState(initialState?.tripName ?? 'Terschelling to Texel');
+      const [isNightMode, setIsNightMode] = useState(initialState?.isNightMode ?? false);
+      const [timeMode, setTimeMode] = useState(initialState?.timeMode ?? 'LT');
+      const [saveStatus, setSaveStatus] = useState('');
+      const [tempPin, setTempPin] = useState(null);
+      const [isPrinting, setIsPrinting] = useState(false);
+      
+      // Scenarios State
+      const [activeScenario, setActiveScenario] = useState(initialState?.activeScenario ?? 'A');
+      const scenarioOptions = Array.from({length: 26}, (_, i) => String.fromCharCode(65 + i));
+
+      // Drag & Drop State
+      const [dragIndex, setDragIndex] = useState(null);
+      const [dragOverIndex, setDragOverIndex] = useState(null);
+      
+      // Map Interactive State
+      const [plotMode, setPlotMode] = useState('off'); // 'off', 'wp', 'poi', 'refuge'
+      const [isSatellite, setIsSatellite] = useState(false);
+      const [showDepth, setShowDepth] = useState(true);
+      
+      // Vessel State
+      const [vessel, setVessel] = useState(initialState?.vessel ?? {
+        name: 'SV Seabird',
+        mmsi: '235123456',
+        draft: 1.8,
+        airDraft: 14.5,
+        speed: 6.0, 
+        crewNotes: 'John (Skipper), Sarah (Asthma - inhaler in grab bag)'
+      });
+
+      // Weather State
+      const [weather, setWeather] = useState(initialState?.weather ?? {
+        source: 'KNMI / Marifoon',
+        issueTime: new Date(Date.now() - 2 * 3600 * 1000).toISOString().slice(0, 16),
+        wind: 'SW 15-20 kts (Bft 5)',
+        visibility: 'Good',
+        seaState: 'Moderate'
+      });
+
+      // Plotting Data State
+      const [waypoints, setWaypoints] = useState(initialState?.waypoints ?? defaultWaypoints);
+      const [pois, setPois] = useState(initialState?.pois ?? defaultPois);
+      const [contingencies, setContingencies] = useState(initialState?.contingencies ?? defaultContingencies);
+
+      const mapRef = useRef(null);
+      const mapInstance = useRef(null);
+      const markersRef = useRef([]);
+      const polylineRef = useRef(null);
+      const refugeLinesRef = useRef([]);
+      const mapLayersRef = useRef({});
+      const handleMapClickRef = useRef(null);
+
+      // Sync Self-Modifying HTML Function
+      const syncHTML = async () => {
+        const stateToSave = {
+          tripName, isNightMode, timeMode, activeScenario, vessel, weather, waypoints, pois, contingencies
+        };
+
+        const clone = document.documentElement.cloneNode(true);
+        const root = clone.querySelector('#root');
+        if (root) root.innerHTML = '';
+        
+        const scripts = clone.querySelectorAll('script');
+        scripts.forEach(s => {
+          const isBabel = s.src && s.src.includes('babel.min.js');
+          const isReact = s.src && s.src.includes('react');
+          const isTailwind = s.src && s.src.includes('tailwindcss');
+          const isLeaflet = s.id === 'leaflet-script' || (s.src && s.src.includes('leaflet.js'));
+          const isBabelSource = s.type === 'text/babel';
+          const isStateScript = s.id === 'plotr-state';
+          
+          if (!isBabel && !isReact && !isTailwind && !isLeaflet && !isBabelSource && !isStateScript) {
+             s.remove();
+          }
+        });
+        
+        let stateScript = clone.querySelector('#plotr-state');
+        if (!stateScript) {
+          stateScript = document.createElement('script');
+          stateScript.id = 'plotr-state';
+          stateScript.type = 'application/json';
+          clone.querySelector('head').appendChild(stateScript);
+        }
+        stateScript.textContent = JSON.stringify(stateToSave);
+        
+        const htmlContent = '<!DOCTYPE html>\n<html lang="en">\n' + clone.innerHTML + '\n</html>';
+        const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+        
+        try {
+          // Use modern File System Access API if available to overwrite the actual file
+          if (window.showSaveFilePicker) {
+            const fileHandle = await window.showSaveFilePicker({
+              suggestedName: 'PlotrPlan_Pro.html',
+              types: [{ description: 'HTML App File', accept: { 'text/html': ['.html'] } }],
+            });
+            const writable = await fileHandle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            setSaveStatus('App Synced!');
+          } else {
+            // Fallback for older browsers (direct download)
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'PlotrPlan_Pro.html'; 
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+            setSaveStatus('App Downloaded!');
+          }
+        } catch (error) {
+          if (error.name !== 'AbortError') console.error('HTML sync failed:', error);
+        }
+
+        setTimeout(() => setSaveStatus(''), 3000);
+      };
+
+      // Listen for print dialog close to restore interactive view
+      useEffect(() => {
+        const handleAfterPrint = () => setIsPrinting(false);
+        window.addEventListener('afterprint', handleAfterPrint);
+        return () => window.removeEventListener('afterprint', handleAfterPrint);
+      }, []);
+
+      const generateMarkdownText = () => {
+        const safeTripName = tripName || 'PlotrPlan_Trip';
+        const isoDate = new Date().toISOString().replace(/[:.]/g, '-');
+        const filenameBase = safeTripName.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '_' + isoDate;
+        
+        let md = `---\n`;
+        md += `trip_name: "${safeTripName}"\n`;
+        md += `date: ${new Date().toISOString()}\n`;
+        md += `vessel: "${vessel.name}"\n`;
+        md += `tags:\n  - passage-plan\n  - sailing\n`;
+        md += `---\n\n`;
+
+        md += `# ⛵ ${safeTripName}\n\n`;
+
+        md += `## 🚢 Vessel & Crew\n`;
+        md += `- **Name:** ${vessel.name} (MMSI: ${vessel.mmsi})\n`;
+        md += `- **Draft:** ${vessel.draft}m | **Speed:** ${vessel.speed} kts\n`;
+        md += `- **Crew / Private Notes:**\n  > ${vessel.crewNotes.replace(/\n/g, '\n> ')}\n\n`;
+
+        md += `## 🌤 Weather Matrix\n`;
+        md += `- **Source:** ${weather.source}\n`;
+        md += `- **Issue Time:** ${weather.issueTime}\n`;
+        md += `- **Wind:** ${weather.wind}\n`;
+        md += `- **Sea State:** ${weather.seaState}\n`;
+        md += `- **Visibility:** ${weather.visibility}\n\n`;
+
+        md += `## 🗺 Scenarios Summary\n`;
+        ['A', 'B', 'C'].forEach(sc => {
+          const wps = waypoints.filter(w => w.scenario === sc);
+          if (wps.length === 0) return;
+          let dist = 0;
+          for(let i=0; i<wps.length-1; i++) {
+             dist += parseFloat(calculateNav(wps[i], wps[i+1]).distance);
+          }
+          md += `- **Plan ${sc}**: ${wps.length} Waypoints, ${dist.toFixed(1)} NM Total Distance ${activeScenario === sc ? '*(Active)*' : ''}\n`;
+        });
+        md += `\n`;
+
+        // Complete Markdown Data Tables for all Scenarios with waypoints
+        ['A', 'B', 'C'].forEach(sc => {
+           const scWaypoints = waypoints.filter(w => w.scenario === sc);
+           if (scWaypoints.length === 0) return;
+
+           md += `## 📍 Waypoints (Scenario ${sc})\n`;
+           md += `| WP | Name | Coordinates | CTS to Next | Dist to Next | Notes |\n`;
+           md += `|---|---|---|---|---|---|\n`;
+           scWaypoints.forEach((wp, i) => {
+              const nextWp = scWaypoints[i+1];
+              const nav = nextWp ? calculateNav(wp, nextWp) : null;
+              const cts = nav ? `${nav.cts}°` : '-';
+              const dist = nav ? `${nav.distance} NM` : '-';
+              md += `| ${String(i+1).padStart(2,'0')} | ${wp.name} | ${wp.lat.toFixed(5)}N, ${Math.abs(wp.lon).toFixed(5)}${wp.lon < 0 ? 'W' : 'E'} | ${cts} | ${dist} | ${wp.notes} |\n`;
+           });
+           md += `\n`;
+        });
+
+        md += `## ⚓ Contingencies & Abort Plans\n`;
+        if (contingencies.length === 0) md += `*No contingencies planned.*\n\n`;
+        contingencies.forEach((c, i) => {
+           const letter = String.fromCharCode(66 + i);
+           md += `### Plan ${letter}: ${c.name}\n`;
+           md += `- **Location:** [${c.lat.toFixed(5)}, ${c.lon.toFixed(5)}]\n`;
+           md += `- **Abort Point:** ${c.abortPoint || 'None'}\n`;
+           md += `- **Details:** ${c.details || 'None'}\n\n`;
+        });
+
+        md += `## 📌 Points of Interest\n`;
+        if (pois.length === 0) md += `*No POIs logged.*\n\n`;
+        pois.forEach(p => {
+           md += `- **${p.name}** (${p.type}): ${p.details} [${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}]\n`;
+        });
+
+        return { md, filenameBase };
+      };
+
+      // Export to Markdown with Embedded Screenshots
+      const handleExportMarkdown = async () => {
+        const { md, filenameBase } = generateMarkdownText();
+
+        // Trigger Markdown Download with User-Defined Location
+        const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+        
+        try {
+          // Use modern File System Access API if available
+          if (window.showSaveFilePicker) {
+            const fileHandle = await window.showSaveFilePicker({
+              suggestedName: `${filenameBase}.md`,
+              types: [{
+                description: 'Markdown File',
+                accept: { 'text/markdown': ['.md'] },
+              }],
+            });
+            const writable = await fileHandle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            setSaveStatus('Markdown Saved!');
+          } else {
+            // Fallback for older browsers (direct download)
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `${filenameBase}.md`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+            setSaveStatus('Markdown Exported!');
+          }
+        } catch (error) {
+          // Ignore if user cancelled the save dialog
+          if (error.name !== 'AbortError') {
+            console.error('File save failed:', error);
+          }
+        }
+        setTimeout(() => setSaveStatus(''), 3000);
+      };
+
+      // Derived States
+      const isWeatherStale = useMemo(() => {
+        if (!weather.issueTime) return false;
+        const ageHours = (Date.now() - new Date(weather.issueTime).getTime()) / 3600000;
+        return ageHours > 6;
+      }, [weather.issueTime]);
+
+      const activeWaypoints = useMemo(() => waypoints.filter(w => w.scenario === activeScenario), [waypoints, activeScenario]);
+
+      // Map Zoom Function
+      const handleZoomTo = (lat, lon) => {
+        if (mapInstance.current) {
+          mapInstance.current.flyTo([lat, lon], 14, { animate: true, duration: 1 });
+        }
+      };
+
+      // Math Functions for Nav Table
+      const calculateNav = (wp1, wp2) => {
+        const R = 3440; // Nautical Miles
+        const dLat = (wp2.lat - wp1.lat) * Math.PI / 180;
+        const dLon = (wp2.lon - wp1.lon) * Math.PI / 180;
+        const lat1 = wp1.lat * Math.PI / 180;
+        const lat2 = wp2.lat * Math.PI / 180;
+
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.sin(dLon/2) * Math.sin(dLon/2) * Math.cos(lat1) * Math.cos(lat2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        const distance = R * c;
+
+        const y = Math.sin(dLon) * Math.cos(lat2);
+        const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+        const bearing = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+
+        let cts = bearing;
+        const tideSpeed = parseFloat(wp1.tideRate) || 0;
+        const tideDir = parseFloat(wp1.tideSet) || 0;
+        const boatSpeed = parseFloat(vessel.speed);
+
+        if (tideSpeed > 0 && boatSpeed > 0) {
+          const sinDrift = (tideSpeed * Math.sin((tideDir - bearing) * Math.PI / 180)) / boatSpeed;
+          if (Math.abs(sinDrift) <= 1) { 
+            const driftAngle = Math.asin(sinDrift) * 180 / Math.PI;
+            cts = (bearing - driftAngle + 360) % 360;
+          }
+        }
+
+        return { distance: distance.toFixed(1), bearing: Math.round(bearing), cts: Math.round(cts) };
+      };
+
+      // State Handlers (Nu voorzien van veilige "prev" state updates en gecombineerde coördinaat updaters)
+      const addWaypoint = () => {
+        setWaypoints(prev => {
+          const newId = prev.length > 0 ? Math.max(...prev.map(w => w.id)) + 1 : 1;
+          return [...prev, { id: newId, scenario: activeScenario, name: `WP ${newId}`, lat: 53.000000, lon: 5.000000, depth: 5.0, tideSet: 0, tideRate: 0, lightChar: '', notes: '' }];
+        });
+      };
+      const updateWaypoint = (id, field, value) => setWaypoints(prev => prev.map(wp => wp.id === id ? { ...wp, [field]: value } : wp));
+      const updateWaypointCoords = (id, lat, lon) => setWaypoints(prev => prev.map(wp => wp.id === id ? { ...wp, lat, lon } : wp));
+      const removeWaypoint = (id) => setWaypoints(prev => prev.filter(wp => wp.id !== id));
+      
+      const updatePoi = (id, field, value) => setPois(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
+      const updatePoiCoords = (id, lat, lon) => setPois(prev => prev.map(p => p.id === id ? { ...p, lat, lon } : p));
+      const removePoi = (id) => setPois(prev => prev.filter(p => p.id !== id));
+      
+      const addContingency = () => {
+        setContingencies(prev => {
+          const newId = prev.length > 0 ? Math.max(...prev.map(c => c.id)) + 1 : 1;
+          return [...prev, { id: newId, name: '', lat: 53.000000, lon: 5.000000, relatedWpId: '', abortPoint: '', details: '', isActive: false }];
+        });
+      };
+      const updateContingency = (id, field, value) => setContingencies(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c));
+      const updateContingencyCoords = (id, lat, lon) => setContingencies(prev => prev.map(c => c.id === id ? { ...c, lat, lon } : c));
+      const removeContingency = (id) => setContingencies(prev => prev.filter(c => c.id !== id));
+      
+      const applyStandardPort = (contId, portName) => {
+        if (!portName) return;
+        let selectedPort = null;
+        standardPortsDB.forEach(group => {
+          const port = group.ports.find(p => p.name === portName);
+          if (port) selectedPort = port;
+        });
+        
+        if (selectedPort) {
+          setContingencies(prev => prev.map(c => c.id === contId ? { ...c, name: selectedPort.name, lat: selectedPort.lat, lon: selectedPort.lon } : c));
+        }
+      };
+
+      // Drag and Drop Logic
+      const handleDragStart = (e, index) => {
+        setDragIndex(index);
+        e.dataTransfer.effectAllowed = "move";
+      };
+      const handleDragEnter = (e, index) => setDragOverIndex(index);
+      const handleDragOver = (e) => e.preventDefault();
+      const handleDrop = (e, dropIndex) => {
+        e.preventDefault();
+        if (dragIndex === null || dragIndex === dropIndex) {
+          setDragIndex(null); setDragOverIndex(null); return;
+        }
+        
+        setWaypoints(prev => {
+          const otherWps = prev.filter(w => w.scenario !== activeScenario);
+          const reorderedActiveWps = prev.filter(w => w.scenario === activeScenario);
+          const [draggedItem] = reorderedActiveWps.splice(dragIndex, 1);
+          reorderedActiveWps.splice(dropIndex, 0, draggedItem);
+          return [...otherWps, ...reorderedActiveWps];
+        });
+
+        setDragIndex(null); setDragOverIndex(null);
+      };
+
+      const togglePlotMode = (mode) => setPlotMode(prev => prev === mode ? 'off' : mode);
+
+      // Map Click Logic
+      useEffect(() => {
+        handleMapClickRef.current = (e) => {
+          if (plotMode === 'off') return;
+          const { lat, lng } = e.latlng;
+          
+          let closestWpId = '';
+          let minDistance = Infinity;
+          activeWaypoints.forEach(wp => {
+              const dist = Math.sqrt(Math.pow(lat - wp.lat, 2) + Math.pow(lng - wp.lon, 2));
+              if(dist < minDistance) { minDistance = dist; closestWpId = wp.id; }
+          });
+
+          if (plotMode === 'wp') {
+            const newId = waypoints.length > 0 ? Math.max(...waypoints.map(w => w.id)) + 1 : 1;
+            setWaypoints(prev => [...prev, { 
+              id: newId, scenario: activeScenario, name: `WP ${newId}`, lat: parseFloat(lat.toFixed(6)), lon: parseFloat(lng.toFixed(6)), 
+              depth: 5.0, tideSet: 0, tideRate: 0, lightChar: '', notes: '' 
+            }]);
+          } else if (plotMode === 'poi') {
+            const newId = pois.length > 0 ? Math.max(...pois.map(p => p.id)) + 1 : 1;
+            setPois(prev => [...prev, { 
+              id: newId, name: `Locating...`, type: 'Other', details: '', 
+              lat: parseFloat(lat.toFixed(6)), lon: parseFloat(lng.toFixed(6)), relatedWpId: closestWpId
+            }]);
+
+            fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=14`)
+              .then(res => res.json())
+              .then(data => {
+                let suggestedName = data.name || data.address?.water || data.address?.bay || data.address?.county || `POI at ${lat.toFixed(2)}`;
+                setPois(prev => prev.map(p => p.id === newId ? { ...p, name: `Near ${suggestedName}` } : p));
+              })
+              .catch(() => setPois(prev => prev.map(p => p.id === newId ? { ...p, name: `POI ${newId}` } : p)));
+          } else if (plotMode === 'refuge') {
+            const newId = contingencies.length > 0 ? Math.max(...contingencies.map(c => c.id)) + 1 : 1;
+            setContingencies(prev => [...prev, {
+                id: newId, name: 'Map Refuge Point', lat: parseFloat(lat.toFixed(6)), lon: parseFloat(lng.toFixed(6)),
+                relatedWpId: closestWpId, abortPoint: '', details: '', isActive: false
+            }]);
+          } else if (plotMode === 'pin') {
+            setTempPin({ lat: parseFloat(lat.toFixed(6)), lon: parseFloat(lng.toFixed(6)) });
+          }
+        };
+      }, [plotMode, waypoints, activeWaypoints, pois, contingencies, activeScenario]);
+
+      // Leaflet Map Initialization
+      useEffect(() => {
+        if (isPrinting) return; // Do not initialize map in print mode
+        
+        if (window.L && !mapInstance.current && mapRef.current) {
+          const map = window.L.map(mapRef.current).setView([53.056, 5.398], 10);
+          
+          const osmLayer = window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, zIndex: 1, attribution: '&copy; OpenStreetMap' });
+          const satLayer = window.L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, zIndex: 1, attribution: 'Tiles &copy; Esri' });
+          const seamarkLayer = window.L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', { maxZoom: 19, zIndex: 3, attribution: '&copy; OpenSeaMap' });
+          const depthLayer = window.L.tileLayer.wms('https://ows.emodnet-bathymetry.eu/wms', {
+              layers: 'emodnet:contours', format: 'image/png', transparent: true, opacity: 0.75, zIndex: 2, attribution: '&copy; EMODnet'
+          });
+
+          mapLayersRef.current = { osm: osmLayer, sat: satLayer, seamark: seamarkLayer, depth: depthLayer };
+
+          (isSatellite ? satLayer : osmLayer).addTo(map);
+          if (showDepth) depthLayer.addTo(map);
+          seamarkLayer.addTo(map);
+
+          map.on('click', (e) => { if (handleMapClickRef.current) handleMapClickRef.current(e); });
+          mapInstance.current = map;
+
+          if (activeWaypoints.length > 0) {
+            map.fitBounds(window.L.latLngBounds(activeWaypoints.map(wp => [wp.lat, wp.lon])), { padding: [50, 50] });
+          }
+        }
+        
+        return () => { if (mapInstance.current) { mapInstance.current.remove(); mapInstance.current = null; } };
+      }, [isPrinting]);
+
+      // Handle Base Map Toggles
+      useEffect(() => {
+        if (!mapInstance.current || !mapLayersRef.current.osm || isPrinting) return;
+        const map = mapInstance.current;
+        const { osm, sat, seamark, depth } = mapLayersRef.current;
+        
+        if (isSatellite) {
+          if (map.hasLayer(osm)) map.removeLayer(osm);
+          if (!map.hasLayer(sat)) map.addLayer(sat);
+        } else {
+          if (map.hasLayer(sat)) map.removeLayer(sat);
+          if (!map.hasLayer(osm)) map.addLayer(osm);
+        }
+
+        if (showDepth) {
+          if (!map.hasLayer(depth)) map.addLayer(depth);
+        } else {
+          if (map.hasLayer(depth)) map.removeLayer(depth);
+        }
+      }, [isSatellite, showDepth, isPrinting]);
+
+      // Handle Map Markers and Lines
+      useEffect(() => {
+        if (!mapInstance.current || !window.L || isPrinting) return;
+        const map = mapInstance.current;
+
+        markersRef.current.forEach(m => map.removeLayer(m));
+        markersRef.current = [];
+        if (polylineRef.current) map.removeLayer(polylineRef.current);
+        refugeLinesRef.current.forEach(l => map.removeLayer(l));
+        refugeLinesRef.current = [];
+
+        const latlngs = activeWaypoints.map(wp => [wp.lat, wp.lon]);
+
+        activeWaypoints.forEach((wp, index) => {
+          const displayIndex = String(index + 1).padStart(2, '0');
+          const wpIcon = window.L.divIcon({
+            className: 'custom-div-icon',
+            html: `<div style="background-color: ${isNightMode ? '#7f1d1d' : '#2563eb'}; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">${displayIndex}</div>`,
+            iconSize: [24, 24], iconAnchor: [12, 12]
+          });
+          
+          // Maak waypoint markering versleepbaar
+          const marker = window.L.marker([wp.lat, wp.lon], { icon: wpIcon, draggable: true }).addTo(map);
+          
+          // Update status wanneer drag-and-drop is voltooid
+          marker.on('dragend', (e) => {
+            const { lat, lng } = e.target.getLatLng();
+            updateWaypointCoords(wp.id, parseFloat(lat.toFixed(6)), parseFloat(lng.toFixed(6)));
+          });
+
+          marker.bindTooltip(
+            `<div class="text-xs"><b>${wp.name || `WP ${wp.id}`}</b><br/><span class="text-[10px] opacity-80">${wp.lat.toFixed(6)}N, ${Math.abs(wp.lon).toFixed(6)}${wp.lon < 0 ? 'W' : 'E'}</span><br/><span class="text-[8px] italic opacity-50">(Sleep om te verplaatsen)</span></div>`, 
+            { permanent: true, direction: 'right', className: `font-bold border-0 shadow-md backdrop-blur-sm ${isNightMode ? 'bg-red-950/90 text-red-500' : 'bg-white/90 text-slate-800'}` }
+          );
+          markersRef.current.push(marker);
+        });
+
+        if (latlngs.length > 1) {
+          polylineRef.current = window.L.polyline(latlngs, {
+            color: isNightMode ? '#ef4444' : '#3b82f6', weight: 3, dashArray: '8, 8'
+          }).addTo(map);
+        }
+
+        pois.forEach((poi) => {
+          const poiIcon = window.L.divIcon({
+            className: 'custom-div-icon',
+            html: `<div style="background-color: #f59e0b; color: white; border-radius: 4px; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 12px; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.5); transform: rotate(45deg);"><div style="transform: rotate(-45deg); font-weight: bold;">${poi.type.charAt(0)}</div></div>`,
+            iconSize: [20, 20], iconAnchor: [10, 10]
+          });
+          
+          // Maak POI markering versleepbaar
+          const marker = window.L.marker([poi.lat, poi.lon], { icon: poiIcon, draggable: true }).addTo(map);
+          
+          // Update status wanneer drag-and-drop is voltooid
+          marker.on('dragend', (e) => {
+            const { lat, lng } = e.target.getLatLng();
+            updatePoiCoords(poi.id, parseFloat(lat.toFixed(6)), parseFloat(lng.toFixed(6)));
+          });
+
+          marker.bindTooltip(
+            `<div class="text-xs"><b>${poi.name}</b><br/><span class="text-[10px] text-amber-600">${poi.type}</span><br/><span class="text-[8px] italic text-slate-500">(Sleep om te verplaatsen)</span></div>`,
+            { direction: 'top', className: `font-bold border-0 shadow-md backdrop-blur-sm ${isNightMode ? 'bg-black/90 text-amber-500' : 'bg-white/90 text-slate-800'}` }
+          );
+          markersRef.current.push(marker);
+        });
+
+        contingencies.forEach((cont, idx) => {
+          const planLetter = String.fromCharCode(66 + idx);
+          if (cont.lat && cont.lon) {
+            const contIcon = window.L.divIcon({
+              className: 'custom-div-icon',
+              html: `<div style="background-color: ${cont.isActive ? '#10b981' : '#f59e0b'}; color: white; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.5);">${planLetter}⚓</div>`,
+              iconSize: [26, 26], iconAnchor: [13, 13]
+            });
+            
+            // Maak uitwijkhaven markering versleepbaar
+            const marker = window.L.marker([cont.lat, cont.lon], { icon: contIcon, draggable: true }).addTo(map);
+            
+            // Update status wanneer drag-and-drop is voltooid
+            marker.on('dragend', (e) => {
+              const { lat, lng } = e.target.getLatLng();
+              updateContingencyCoords(cont.id, parseFloat(lat.toFixed(6)), parseFloat(lng.toFixed(6)));
+            });
+
+            marker.bindTooltip(
+              `<div class="text-xs"><b>Plan ${planLetter}: ${cont.name || 'Refuge'}</b><br/><span class="text-[10px] text-amber-600">Port of Refuge</span><br/><span class="text-[8px] italic text-slate-500">(Sleep om te verplaatsen)</span></div>`,
+              { direction: 'top', className: `font-bold border-0 shadow-md backdrop-blur-sm ${isNightMode ? 'bg-black/90 text-amber-500' : 'bg-white/90 text-slate-800'}` }
+            );
+            markersRef.current.push(marker);
+
+            if (cont.relatedWpId) {
+              const wp = activeWaypoints.find(w => w.id === cont.relatedWpId);
+              if (wp) {
+                const line = window.L.polyline([[wp.lat, wp.lon], [cont.lat, cont.lon]], {
+                  color: cont.isActive ? '#10b981' : '#f59e0b',
+                  weight: cont.isActive ? 4 : 2,
+                  dashArray: cont.isActive ? '' : '6, 6',
+                  opacity: cont.isActive ? 1.0 : 0.6
+                }).addTo(map);
+                refugeLinesRef.current.push(line);
+              }
+            }
+          }
+        });
+
+        if (tempPin) {
+          const pinIcon = window.L.divIcon({
+            className: 'custom-div-icon',
+            html: `<div style="background-color: #a855f7; color: white; border-radius: 50% 50% 50% 0; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 12px; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.5); transform: rotate(-45deg);"><i class="fa-solid fa-thumbtack" style="transform: rotate(45deg);"></i></div>`,
+            iconSize: [24, 24], iconAnchor: [12, 24]
+          });
+          const marker = window.L.marker([tempPin.lat, tempPin.lon], { icon: pinIcon }).addTo(map);
+          marker.bindTooltip(`<div class="text-xs font-bold">Temporary Pin</div>`, { direction: 'top', className: isNightMode ? 'bg-black/90 text-purple-400' : 'bg-white/90 text-purple-700' });
+          markersRef.current.push(marker);
+        }
+
+      }, [activeWaypoints, pois, contingencies, isNightMode, tempPin, isPrinting]);
+
+      // Theming Classes
+      const theme = {
+        bg: isNightMode ? 'bg-black' : 'bg-slate-100',
+        text: isNightMode ? 'text-red-500' : 'text-slate-800',
+        textMuted: isNightMode ? 'text-red-700' : 'text-slate-500',
+        card: isNightMode ? 'bg-zinc-950 border border-red-900 shadow-none' : 'bg-white border border-slate-200 shadow-sm',
+        input: isNightMode ? 'bg-zinc-900 border-red-900 text-red-500 focus:border-red-500' : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-blue-500',
+        dangerCard: isNightMode ? 'bg-red-950/30 border-red-800' : 'bg-red-50 border-red-200',
+        btnPrimary: isNightMode ? 'bg-red-900 text-black hover:bg-red-800' : 'bg-blue-600 text-white hover:bg-blue-700',
+        btnWpActive: isNightMode ? 'bg-red-600 text-black shadow-lg shadow-red-900' : 'bg-green-600 text-white shadow-lg shadow-green-200',
+        btnPoiActive: isNightMode ? 'bg-amber-600 text-black shadow-lg shadow-amber-900' : 'bg-amber-500 text-white shadow-lg shadow-amber-200',
+        btnRefugeActive: isNightMode ? 'bg-emerald-800 text-black shadow-lg shadow-emerald-900' : 'bg-emerald-500 text-white shadow-lg shadow-emerald-200',
+        btnPinActive: isNightMode ? 'bg-purple-800 text-black shadow-lg shadow-purple-900' : 'bg-purple-500 text-white shadow-lg shadow-purple-200',
+        divider: isNightMode ? 'border-red-900/50' : 'border-slate-200',
+        dragActive: isNightMode ? 'bg-red-900/20 border-red-500 border-dashed' : 'bg-blue-50/50 border-blue-400 border-dashed'
+      };
+
+      const copyToClipboard = (text) => {
+          const textArea = document.createElement("textarea");
+          textArea.value = text;
+          document.body.appendChild(textArea);
+          textArea.select();
+          try {
+              document.execCommand('copy');
+              setSaveStatus('Copied to Clipboard!');
+              setTimeout(() => setSaveStatus(''), 2000);
+          } catch (err) {
+              console.error('Copy failed', err);
+          }
+          document.body.removeChild(textArea);
+      };
+
+      // --- PRINT VIEW RENDER ---
+      if (isPrinting) {
+        return (
+          <div className="bg-white text-black p-8 font-sans max-w-5xl mx-auto">
+            <div className="text-center mb-10">
+              <h1 className="text-4xl font-bold uppercase tracking-widest">{tripName || 'Passage Plan'}</h1>
+              <p className="text-gray-500 mt-2">Generated by PlotrPlan Pro on {new Date().toLocaleDateString()}</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-8 mb-10">
+              <div>
+                <h2 className="text-xl font-bold mb-3 border-b-2 border-black pb-1">Vessel & Crew</h2>
+                <ul className="space-y-2 text-sm">
+                  <li><strong>Name:</strong> {vessel.name} (MMSI: {vessel.mmsi})</li>
+                  <li><strong>Draft:</strong> {vessel.draft}m &nbsp;|&nbsp; <strong>Speed:</strong> {vessel.speed} kts</li>
+                  <li><strong>Crew Notes:</strong> {vessel.crewNotes || 'None'}</li>
+                </ul>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold mb-3 border-b-2 border-black pb-1">Weather Matrix</h2>
+                <ul className="space-y-2 text-sm">
+                  <li><strong>Source:</strong> {weather.source}</li>
+                  <li><strong>Issue Time:</strong> {new Date(weather.issueTime).toLocaleString()}</li>
+                  <li><strong>Wind:</strong> {weather.wind}</li>
+                  <li><strong>Sea State:</strong> {weather.seaState} &nbsp;|&nbsp; <strong>Vis:</strong> {weather.visibility}</li>
+                </ul>
+              </div>
+            </div>
+
+            {['A', 'B', 'C'].map(sc => {
+              const wps = waypoints.filter(w => w.scenario === sc);
+              if (wps.length === 0) return null;
+              
+              let totalDist = 0;
+              for(let i=0; i<wps.length-1; i++) totalDist += parseFloat(calculateNav(wps[i], wps[i+1]).distance);
+
+              return (
+                <div key={sc} className="mb-10 page-break-inside-avoid">
+                  <div className="flex justify-between items-end mb-3 border-b-2 border-black pb-1">
+                     <h2 className="text-xl font-bold">Plan {sc} <span className="text-sm font-normal italic text-gray-500 ml-2">(Waypoints)</span></h2>
+                     <span className="text-sm font-bold">Total Dist: {totalDist.toFixed(1)} NM</span>
+                  </div>
+                  <table className="w-full text-left border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="border border-gray-300 p-2 w-8">WP</th>
+                        <th className="border border-gray-300 p-2">Name</th>
+                        <th className="border border-gray-300 p-2 w-32">Lat / Lon</th>
+                        <th className="border border-gray-300 p-2 w-16">CTS</th>
+                        <th className="border border-gray-300 p-2 w-20">Dist</th>
+                        <th className="border border-gray-300 p-2 w-16">Depth</th>
+                        <th className="border border-gray-300 p-2">Notes & Lights</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {wps.map((wp, i) => {
+                        const nextWp = wps[i+1];
+                        const nav = nextWp ? calculateNav(wp, nextWp) : null;
+                        return (
+                          <tr key={wp.id} className="even:bg-gray-50">
+                            <td className="border border-gray-300 p-2 font-bold text-center">{String(i+1).padStart(2,'0')}</td>
+                            <td className="border border-gray-300 p-2 font-semibold">{wp.name}</td>
+                            <td className="border border-gray-300 p-2 font-mono text-xs">{wp.lat.toFixed(5)}N<br/>{Math.abs(wp.lon).toFixed(5)}{wp.lon < 0 ? 'W' : 'E'}</td>
+                            <td className="border border-gray-300 p-2 font-mono font-bold text-center text-blue-700">{nav ? nav.cts + '°' : '-'}</td>
+                            <td className="border border-gray-300 p-2 font-mono text-center">{nav ? nav.distance + ' NM' : '-'}</td>
+                            <td className="border border-gray-300 p-2 text-center">{wp.depth}m</td>
+                            <td className="border border-gray-300 p-2 text-xs">
+                               {wp.notes}
+                               {wp.lightChar && <div className="mt-1 font-mono text-[10px] bg-yellow-100 inline-block px-1 border border-yellow-300">💡 {wp.lightChar}</div>}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            })}
+
+            <div className="grid grid-cols-2 gap-8 mt-10" style={{ pageBreakInside: 'avoid' }}>
+              <div>
+                <h2 className="text-xl font-bold mb-3 border-b-2 border-black pb-1">Contingencies</h2>
+                {contingencies.length === 0 ? <p className="text-sm italic text-gray-500">No contingencies planned.</p> : (
+                  <ul className="space-y-4 text-sm">
+                    {contingencies.map((c, i) => (
+                      <li key={c.id} className="bg-gray-50 p-3 border border-gray-200 rounded">
+                        <div className="font-bold mb-1">Plan {String.fromCharCode(66+i)}: {c.name || 'Refuge'} {c.isActive && '(ACTIVE)'}</div>
+                        <div className="text-xs text-gray-600 mb-1 font-mono">[{c.lat.toFixed(5)}, {c.lon.toFixed(5)}]</div>
+                        <div><strong>Abort:</strong> {c.abortPoint || 'N/A'}</div>
+                        <div><strong>Details:</strong> {c.details || 'N/A'}</div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <div>
+                <h2 className="text-xl font-bold mb-3 border-b-2 border-black pb-1">Points of Interest</h2>
+                {pois.length === 0 ? <p className="text-sm italic text-gray-500">No POIs logged.</p> : (
+                  <ul className="space-y-3 text-sm">
+                    {pois.map(p => (
+                      <li key={p.id} className="bg-gray-50 p-3 border border-gray-200 rounded">
+                        <div className="font-bold mb-1">{p.name} <span className="text-xs font-normal text-gray-500 uppercase tracking-wider ml-1">({p.type})</span></div>
+                        <div className="text-xs text-gray-600 mb-1 font-mono">[{p.lat.toFixed(5)}, {p.lon.toFixed(5)}]</div>
+                        <div>{p.details || <span className="italic text-gray-400">No details</span>}</div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+            
+            <div className="text-center mt-12 text-xs text-gray-400 border-t pt-4">
+               -- End of Passage Plan --
+            </div>
+            
+            {/* Cancel Button visible on screen but hidden in print */}
+            <div className="mt-8 text-center print:hidden">
+               <button onClick={() => setIsPrinting(false)} className="px-6 py-2 bg-slate-800 text-white font-bold rounded hover:bg-slate-700">
+                  Return to Interactive App
+               </button>
+            </div>
+          </div>
+        );
+      }
+      // --- END PRINT VIEW ---
+
+      return (
+        <div className={`min-h-screen p-2 md:p-6 transition-colors duration-300 ${theme.bg} ${theme.text} font-sans`}>
+          <datalist id="lights-list">
+            <option value="Fl.(4)W. 30s" /> <option value="Fl.R. 5s" /> <option value="Q.G." /> <option value="Iso.4s" />
+          </datalist>
+
+          {/* Top Navigation Bar & Trip Name */}
+          <div className={`max-w-7xl mx-auto flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6 p-4 rounded-xl ${theme.card}`}>
+            
+            <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
+              <div className="flex items-center space-x-3">
+                <i className="fa-solid fa-compass text-3xl"></i>
+                <input
+                   type="text"
+                   value={tripName}
+                   onChange={e => setTripName(e.target.value)}
+                   className={`text-xl sm:text-2xl font-bold tracking-tight bg-transparent border-b-2 border-transparent focus:border-blue-400 outline-none w-full sm:w-64 pb-0.5`}
+                   placeholder="Enter Trip Name..."
+                />
+              </div>
+              
+              <div className="w-px h-6 bg-slate-300 dark:bg-slate-700 hidden sm:block mx-1"></div>
+              
+              <div className="flex items-center space-x-2">
+                <button 
+                  onClick={syncHTML}
+                  className={`flex items-center space-x-2 text-sm font-bold px-3 py-1.5 rounded border transition-colors ${isNightMode ? 'border-blue-900 bg-blue-950/30 text-blue-500 hover:bg-blue-900' : 'border-slate-300 bg-white hover:bg-blue-50 hover:text-blue-600'}`}
+                  title="Sync changes directly back to your HTML file"
+                >
+                  <i className="fa-solid fa-arrows-rotate"></i>
+                  <span className="hidden sm:inline">Sync HTML</span>
+                </button>
+
+                <button 
+                  onClick={() => {
+                    const { md } = generateMarkdownText();
+                    copyToClipboard(md);
+                  }}
+                  className={`flex items-center space-x-2 text-sm font-bold px-3 py-1.5 rounded border transition-colors ${isNightMode ? 'border-purple-900 bg-purple-950/30 text-purple-400 hover:bg-purple-900' : 'border-slate-300 bg-white hover:bg-purple-50 hover:text-purple-600'}`}
+                  title="Copy Markdown to Clipboard"
+                >
+                  <i className="fa-regular fa-copy text-lg"></i>
+                  <span className="hidden sm:inline">Copy MD</span>
+                </button>
+
+                <button 
+                  onClick={handleExportMarkdown}
+                  className={`flex items-center space-x-2 text-sm font-bold px-3 py-1.5 rounded border transition-colors ${isNightMode ? 'border-amber-900 bg-amber-950/30 text-amber-500 hover:bg-amber-900' : 'border-slate-300 bg-white hover:bg-amber-50 hover:text-amber-600'}`}
+                  title="Export to Markdown for Obsidian"
+                >
+                  <i className="fa-brands fa-markdown text-lg"></i>
+                  <span className="hidden xl:inline">Export MD</span>
+                </button>
+
+                <button 
+                  onClick={() => { setIsPrinting(true); setTimeout(() => window.print(), 300); }}
+                  className={`flex items-center space-x-2 text-sm font-bold px-3 py-1.5 rounded border transition-colors ${isNightMode ? 'border-red-900 bg-red-950/30 text-red-500 hover:bg-red-900' : 'border-slate-300 bg-white hover:bg-red-50 hover:text-red-600'}`}
+                  title="Export to PDF (All Scenarios)"
+                >
+                  <i className="fa-solid fa-file-pdf text-lg"></i>
+                  <span className="hidden xl:inline">Export PDF</span>
+                </button>
+              </div>
+
+              {saveStatus && <span className="text-emerald-500 text-sm font-bold animate-pulse hidden lg:inline">{saveStatus}</span>}
+            </div>
+
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <span className="text-sm font-semibold">Time:</span>
+                <button onClick={() => setTimeMode(timeMode === 'LT' ? 'UT' : 'LT')} className={`px-3 py-1 rounded font-mono text-sm font-bold border ${theme.input}`}>
+                  {timeMode}
+                </button>
+              </div>
+              <button onClick={() => setIsNightMode(!isNightMode)} className={`p-2 rounded-full border ${isNightMode ? 'border-red-500 bg-red-950/50' : 'border-slate-300 bg-slate-100'}`}>
+                {isNightMode ? <i className="fa-solid fa-moon"></i> : <i className="fa-solid fa-sun"></i>}
+              </button>
+            </div>
+          </div>
+
+          <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            {/* LEFT COLUMN: Appraisal & Context */}
+            <div className="lg:col-span-4 space-y-6">
+              
+              <CollapsibleSection title="Vessel & Crew" icon={<i className="fa-solid fa-ship text-lg"></i>} className={theme.card} defaultOpen={true}>
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div><label className={`block text-xs uppercase mb-1 ${theme.textMuted}`}>Draft (m)</label><input type="number" step="0.1" value={vessel.draft} onChange={e => setVessel({...vessel, draft: parseFloat(e.target.value)})} className={`w-full p-2 rounded text-sm border ${theme.input}`} /></div>
+                  <div><label className={`block text-xs uppercase mb-1 ${theme.textMuted}`}>Boat Spd (kts)</label><input type="number" step="0.1" value={vessel.speed} onChange={e => setVessel({...vessel, speed: parseFloat(e.target.value)})} className={`w-full p-2 rounded text-sm border ${theme.input}`} /></div>
+                </div>
+                <div><label className={`block text-xs uppercase mb-1 ${theme.textMuted}`}>Crew Vault (Private)</label><textarea value={vessel.crewNotes} onChange={e => setVessel({...vessel, crewNotes: e.target.value})} className={`w-full p-2 rounded text-sm border h-16 ${theme.input}`} /></div>
+              </CollapsibleSection>
+
+              <CollapsibleSection 
+                title="Weather Matrix" 
+                icon={<i className="fa-solid fa-temperature-half text-lg"></i>} 
+                className={isWeatherStale ? theme.dangerCard : theme.card}
+                defaultOpen={true}
+                extraHeader={isWeatherStale && <div className="flex items-center space-x-1 text-red-600 animate-pulse"><i className="fa-solid fa-triangle-exclamation"></i><span className="text-xs font-bold uppercase hidden sm:inline">Stale Data</span></div>}
+              >
+                <div className="space-y-3">
+                  <div><label className={`block text-xs uppercase mb-1 flex justify-between ${theme.textMuted}`}><span>Forecast Issue Time</span></label>
+                    <input type="datetime-local" value={weather.issueTime} onChange={e => setWeather({...weather, issueTime: e.target.value})} className={`w-full p-2 rounded text-sm border ${theme.input}`} />
+                  </div>
+                </div>
+              </CollapsibleSection>
+
+              <CollapsibleSection title="Contingencies & Abort Plans" icon={<i className="fa-solid fa-anchor text-amber-500 text-lg"></i>} className={`border-l-4 border-l-amber-500 ${theme.card}`} defaultOpen={true}>
+                 <div className="space-y-4">
+                   {contingencies.map((cont, idx) => (
+                      <div key={cont.id} className={`p-3 border rounded-lg ${cont.isActive ? (isNightMode ? 'border-emerald-800 bg-emerald-950/20' : 'border-emerald-400 bg-emerald-50') : theme.divider}`}>
+                         <div className="flex justify-between items-center mb-3 border-b pb-2">
+                            <span className="text-xs font-bold uppercase flex items-center">
+                              <i className="fa-solid fa-life-ring mr-1 text-amber-500"></i> Plan {String.fromCharCode(66 + idx)}
+                            </span>
+                            <div className="flex space-x-2">
+                              <button 
+                                onClick={() => updateContingency(cont.id, 'isActive', !cont.isActive)}
+                                className={`flex items-center px-2 py-1 text-[10px] uppercase font-bold rounded border transition-colors ${cont.isActive ? 'bg-emerald-500 text-white border-emerald-600' : (isNightMode ? 'bg-zinc-800 text-slate-300 border-zinc-700' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100')}`}
+                              >
+                                {cont.isActive ? <><i className="fa-solid fa-circle-check mr-1"></i> Active Plan</> : <><i className="fa-regular fa-circle mr-1"></i> Make Active</>}
+                              </button>
+                              <button onClick={() => removeContingency(cont.id)} className="opacity-50 hover:opacity-100 hover:text-red-500"><i className="fa-solid fa-trash"></i></button>
+                            </div>
+                         </div>
+
+                         <div className="grid grid-cols-1 gap-3">
+                            <div className="flex gap-2">
+                              <div className="flex-1">
+                                 <label className={`block text-[10px] uppercase ${theme.textMuted}`}>Port of Refuge Name</label>
+                                 <input type="text" value={cont.name} onChange={e => updateContingency(cont.id, 'name', e.target.value)} className={`w-full p-1.5 rounded text-sm border ${theme.input}`} />
+                              </div>
+                              <div className="w-8 flex items-end pb-1">or</div>
+                              <div className="flex-1">
+                                 <label className={`block text-[10px] uppercase ${theme.textMuted}`}>Standard DB</label>
+                                 <select onChange={(e) => applyStandardPort(cont.id, e.target.value)} className={`w-full p-1.5 rounded text-[11px] border ${theme.input}`}>
+                                    <option value="">- Select -</option>
+                                    {standardPortsDB.map(g => (
+                                      <optgroup label={g.group} key={g.group}>
+                                        {g.ports.map(p => <option value={p.name} key={p.name}>{p.name}</option>)}
+                                      </optgroup>
+                                    ))}
+                                 </select>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                               <div>
+                                 <label className={`block text-[10px] uppercase ${theme.textMuted}`}>Lat</label>
+                                 <input type="number" step="0.000001" value={cont.lat} onChange={e => updateContingency(cont.id, 'lat', parseFloat(e.target.value))} className={`w-full p-1.5 rounded text-xs border font-mono ${theme.input}`} />
+                               </div>
+                               <div>
+                                 <label className={`block text-[10px] uppercase ${theme.textMuted}`}>Lon</label>
+                                 <input type="number" step="0.000001" value={cont.lon} onChange={e => updateContingency(cont.id, 'lon', parseFloat(e.target.value))} className={`w-full p-1.5 rounded text-xs border font-mono ${theme.input}`} />
+                               </div>
+                               <div>
+                                 <label className={`block text-[10px] uppercase ${theme.textMuted}`}>Related WP</label>
+                                 <select value={cont.relatedWpId || ''} onChange={e => updateContingency(cont.id, 'relatedWpId', e.target.value ? Number(e.target.value) : '')} className={`w-full p-1.5 rounded text-[11px] border ${theme.input}`}>
+                                    <option value="">- None -</option>
+                                    {activeWaypoints.map(w => <option key={w.id} value={w.id}>{w.name || `WP ${w.id}`}</option>)}
+                                 </select>
+                               </div>
+                            </div>
+                            <div>
+                              <label className={`block text-[10px] uppercase ${theme.textMuted}`}>Abort Condition / Turn-Back Point</label>
+                              <input type="text" value={cont.abortPoint} onChange={e => updateContingency(cont.id, 'abortPoint', e.target.value)} placeholder="e.g. If wind shifts to N before WP2" className={`w-full p-1.5 rounded text-sm border ${theme.input}`} />
+                            </div>
+                            {cont.isActive && (
+                               <div className={`mt-2 p-2 rounded border-l-2 border-emerald-500 ${isNightMode ? 'bg-black' : 'bg-white'}`}>
+                                 <label className={`block text-[10px] uppercase font-bold text-emerald-600 mb-1`}>Detailed Refuge Plan</label>
+                                 <textarea 
+                                   value={cont.details} 
+                                   onChange={e => updateContingency(cont.id, 'details', e.target.value)} 
+                                   rows="3" 
+                                   placeholder="Enter pilotage details, VHF channels, depth restrictions..."
+                                   className={`w-full p-2 rounded text-xs border ${theme.input}`}
+                                 ></textarea>
+                               </div>
+                            )}
+                         </div>
+                      </div>
+                   ))}
+                   <button onClick={addContingency} className={`w-full py-2 rounded flex items-center justify-center space-x-2 text-sm font-bold transition-colors bg-transparent border border-dashed hover:bg-black/5 ${theme.divider} ${theme.textMuted}`}>
+                    <i className="fa-solid fa-plus"></i><span>Add Contingency Block</span>
+                   </button>
+                 </div>
+              </CollapsibleSection>
+
+              {/* Maritime Quick Links (New) */}
+              <CollapsibleSection title="Maritime Quick Links" icon={<i className="fa-solid fa-link text-blue-500 text-lg"></i>} className={theme.card} defaultOpen={false}>
+                 <div className="space-y-3">
+                   {quickLinksDB.map((region, i) => (
+                      <details key={i} className={`border rounded-lg ${theme.divider} overflow-hidden group`}>
+                         <summary className={`p-3 font-bold cursor-pointer transition-colors text-sm outline-none flex justify-between items-center ${isNightMode ? 'bg-zinc-900 hover:bg-zinc-800' : 'bg-slate-50 hover:bg-slate-100'}`}>
+                            {region.category}
+                            <i className="fa-solid fa-chevron-down opacity-50 group-open:rotate-180 transition-transform"></i>
+                         </summary>
+                         <div className={`p-4 space-y-4 text-xs ${isNightMode ? 'bg-black' : 'bg-white'}`}>
+                            {region.groups.map((grp, j) => (
+                               <div key={j}>
+                                  <h4 className={`font-bold uppercase mb-1.5 opacity-70 tracking-wide ${theme.textMuted}`}>{grp.name}</h4>
+                                  {grp.text && <div className={`mb-2 whitespace-pre-line font-mono pl-3 border-l-2 ${isNightMode ? 'border-red-800 text-red-400' : 'border-slate-300 text-slate-600'}`}>{grp.text}</div>}
+                                  {grp.links && (
+                                    <div className="flex flex-wrap gap-2">
+                                      {grp.links.map((link, k) => (
+                                         <a key={k} href={link.url} target="_blank" rel="noreferrer" className={`flex items-center px-2 py-1.5 rounded border transition-colors ${isNightMode ? 'border-zinc-800 hover:border-red-500 hover:text-red-400 bg-zinc-900' : 'border-slate-200 hover:border-blue-500 hover:text-blue-600 bg-white shadow-sm'}`}>
+                                           <i className="fa-solid fa-arrow-up-right-from-square mr-1.5 text-[10px] opacity-70"></i> {link.label}
+                                         </a>
+                                      ))}
+                                    </div>
+                                  )}
+                               </div>
+                            ))}
+                         </div>
+                      </details>
+                   ))}
+                 </div>
+              </CollapsibleSection>
+
+            </div>
+
+            {/* RIGHT COLUMN: Execution & Navigation Table */}
+            <div className="lg:col-span-8 space-y-6">
+              
+              {/* Scenario Summary Panel */}
+              <div className="grid grid-cols-3 gap-3">
+                 {['A', 'B', 'C'].map(sc => {
+                    const wps = waypoints.filter(w => w.scenario === sc);
+                    let dist = 0;
+                    for(let i=0; i<wps.length-1; i++) {
+                       dist += parseFloat(calculateNav(wps[i], wps[i+1]).distance);
+                    }
+                    const isActive = activeScenario === sc;
+                    return (
+                       <div 
+                          key={sc} 
+                          onClick={() => setActiveScenario(sc)} 
+                          className={`p-3 sm:p-4 rounded-xl border cursor-pointer transition-all ${isActive ? (isNightMode ? 'bg-red-900/40 border-red-500 shadow-md shadow-red-900/50' : 'bg-blue-50 border-blue-500 shadow-md shadow-blue-500/20') : theme.card} hover:shadow-md`}
+                       >
+                          <div className="text-xs sm:text-sm font-bold uppercase text-slate-500 mb-2 flex justify-between items-center">
+                             <span className={isActive ? (isNightMode ? 'text-red-400' : 'text-blue-600') : theme.textMuted}>Plan {sc}</span>
+                             {isActive && <i className="fa-solid fa-circle-check text-lg text-blue-500 dark:text-red-500"></i>}
+                          </div>
+                          <div className="text-lg sm:text-xl font-bold">{wps.length} <span className="text-[10px] sm:text-xs font-normal opacity-70">WPs</span></div>
+                          <div className="text-md sm:text-lg font-mono">{dist.toFixed(1)} <span className="text-[10px] sm:text-xs font-sans font-normal opacity-70">NM</span></div>
+                       </div>
+                    )
+                 })}
+              </div>
+
+              {/* Interactive Chart Area (Kept strictly visible to prevent Leaflet resize bugs) */}
+              <section className={`p-5 rounded-xl ${theme.card}`}>
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                  <div className="flex items-center space-x-2">
+                    <i className="fa-solid fa-map text-lg"></i>
+                    <h2 className="text-lg font-bold">Interactive Nautical Chart</h2>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-2">
+                    <button onClick={() => setShowDepth(!showDepth)} className={`px-3 py-1.5 rounded flex items-center space-x-2 text-xs font-bold transition-all border ${showDepth ? (isNightMode ? 'bg-zinc-800 border-red-700 text-red-400' : 'bg-blue-100 border-blue-300 text-blue-700') : theme.input}`}>
+                      <i className="fa-solid fa-water"></i>
+                      <span>{showDepth ? 'Depth On' : 'Depth Off'}</span>
+                    </button>
+                    <button onClick={() => setIsSatellite(!isSatellite)} className={`px-3 py-1.5 rounded flex items-center space-x-2 text-xs font-bold transition-all border ${isSatellite ? (isNightMode ? 'bg-zinc-800 border-red-700 text-red-400' : 'bg-slate-800 border-slate-900 text-white') : theme.input}`}>
+                      <i className="fa-solid fa-layer-group"></i>
+                      <span>{isSatellite ? 'Sat Mode' : 'Standard Map'}</span>
+                    </button>
+                    <div className="w-px h-8 bg-slate-300 mx-1 hidden sm:block"></div>
+                    <button onClick={() => togglePlotMode('wp')} className={`px-3 py-1.5 rounded flex items-center space-x-1.5 text-xs font-bold transition-all ${plotMode === 'wp' ? theme.btnWpActive : theme.btnPrimary}`}>
+                      {plotMode === 'wp' ? <i className="fa-solid fa-crosshairs animate-pulse"></i> : <i className="fa-solid fa-location-dot"></i>}
+                      <span className="hidden sm:inline">{plotMode === 'wp' ? 'Plotting...' : 'Plot WP'}</span>
+                    </button>
+                    <button onClick={() => togglePlotMode('poi')} className={`px-3 py-1.5 rounded flex items-center space-x-1.5 text-xs font-bold transition-all ${plotMode === 'poi' ? theme.btnPoiActive : theme.btnPrimary}`}>
+                      {plotMode === 'poi' ? <i className="fa-solid fa-crosshairs animate-pulse"></i> : <i className="fa-solid fa-flag"></i>}
+                      <span className="hidden sm:inline">{plotMode === 'poi' ? 'Plotting...' : 'Plot POI'}</span>
+                    </button>
+                    <button onClick={() => togglePlotMode('refuge')} className={`px-3 py-1.5 rounded flex items-center space-x-1.5 text-xs font-bold transition-all ${plotMode === 'refuge' ? theme.btnRefugeActive : theme.btnPrimary}`}>
+                      {plotMode === 'refuge' ? <i className="fa-solid fa-crosshairs animate-pulse"></i> : <i className="fa-solid fa-life-ring"></i>}
+                      <span className="hidden sm:inline">{plotMode === 'refuge' ? 'Plotting...' : 'Plot Refuge'}</span>
+                    </button>
+                    <button onClick={() => togglePlotMode('pin')} className={`px-3 py-1.5 rounded flex items-center space-x-1.5 text-xs font-bold transition-all ${plotMode === 'pin' ? theme.btnPinActive : theme.btnPrimary}`}>
+                      {plotMode === 'pin' ? <i className="fa-solid fa-crosshairs animate-pulse"></i> : <i className="fa-solid fa-thumbtack"></i>}
+                      <span className="hidden sm:inline">{plotMode === 'pin' ? 'Pinning...' : 'Drop Pin'}</span>
+                    </button>
+                  </div>
+                </div>
+                
+                {plotMode !== 'off' && (
+                   <div className={`mb-3 p-2 text-sm font-bold text-center rounded ${plotMode === 'wp' ? (isNightMode ? 'bg-red-900/20 text-red-400' : 'bg-green-50 text-green-700') : (plotMode === 'poi' ? 'bg-amber-500/20 text-amber-700' : (plotMode === 'pin' ? (isNightMode ? 'bg-purple-900/30 text-purple-400' : 'bg-purple-50 text-purple-700') : 'bg-emerald-500/20 text-emerald-700'))}`}>
+                     Click anywhere on the chart grid below to drop a new {plotMode === 'wp' ? `Waypoint (Scenario ${activeScenario})` : (plotMode === 'poi' ? 'Point of Interest' : (plotMode === 'pin' ? 'Temporary Pin' : 'Port of Refuge Contingency'))}. <br/><span className="text-xs font-normal opacity-75">Je kunt bestaande markeringen op de kaart ook direct verslepen.</span>
+                   </div>
+                )}
+
+                <div className={`relative w-full aspect-[2/1] min-h-[400px] rounded-lg border overflow-hidden bg-slate-800 ${plotMode !== 'off' ? 'map-plotting-mode ring-2 ring-current' : ''} ${isNightMode ? 'map-night-mode' : ''} ${theme.divider}`}>
+                   <div ref={mapRef} className="absolute inset-0 z-0"></div>
+                </div>
+                <div className={`text-right text-[10px] mt-2 opacity-60 font-mono ${theme.textMuted}`}>Overlays: OpenSeaMap (marks) {showDepth && '+ EMODnet (depth contours)'}</div>
+                
+                {tempPin && (
+                   <div className={`mt-4 p-3 rounded-lg border flex items-center justify-between ${isNightMode ? 'bg-zinc-900 border-purple-900' : 'bg-purple-50 border-purple-200'}`}>
+                      <div className="flex items-center space-x-3">
+                         <div className="flex items-center justify-center w-8 h-8 rounded-full bg-purple-500 text-white"><i className="fa-solid fa-thumbtack"></i></div>
+                         <div>
+                            <div className="text-[10px] font-bold uppercase text-purple-600 mb-0.5">Temporary Pin Coordinates</div>
+                            <div className="font-mono text-sm font-bold">Lat: {tempPin.lat.toFixed(6)} | Lon: {tempPin.lon.toFixed(6)}</div>
+                         </div>
+                      </div>
+                      <div className="flex space-x-2">
+                         <button 
+                            onClick={() => copyToClipboard(`${tempPin.lat.toFixed(6)}, ${tempPin.lon.toFixed(6)}`)} 
+                            className={`px-3 py-1.5 text-xs font-bold rounded border transition-colors ${isNightMode ? 'bg-black border-purple-700 text-purple-400 hover:bg-purple-900' : 'bg-white border-purple-300 text-purple-700 hover:bg-purple-100'}`}
+                         >
+                            <i className="fa-regular fa-copy mr-1"></i> Copy
+                         </button>
+                         <button 
+                            onClick={() => setTempPin(null)} 
+                            className={`px-3 py-1.5 text-xs font-bold rounded border transition-colors ${isNightMode ? 'bg-black border-slate-700 text-slate-400 hover:bg-slate-900' : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-100'}`}
+                         >
+                            <i className="fa-solid fa-xmark"></i>
+                         </button>
+                      </div>
+                   </div>
+                )}
+              </section>
+
+              {/* Map Quick Zoom - Now underneath the Chart */}
+              <CollapsibleSection title="Map Quick Zoom" icon={<i className="fa-solid fa-magnifying-glass text-lg"></i>} className={theme.card} defaultOpen={false}>
+                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                    {activeWaypoints.length > 0 && (
+                       <div>
+                          <h3 className={`text-[10px] font-bold uppercase ${theme.textMuted} mb-1 border-b pb-1 ${theme.divider}`}>Waypoints (Plan {activeScenario})</h3>
+                          <div className="max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                            {activeWaypoints.map((wp, idx) => (
+                               <div key={wp.id} onClick={() => handleZoomTo(wp.lat, wp.lon)} className="cursor-pointer text-sm hover:text-blue-500 py-1 transition-colors flex items-center">
+                                  <span className="font-mono text-[10px] mr-2 text-slate-400 bg-black/5 px-1 rounded">{String(idx+1).padStart(2, '0')}</span> 
+                                  {wp.name || `WP ${wp.id}`}
+                               </div>
+                            ))}
+                          </div>
+                       </div>
+                    )}
+                    {contingencies.length > 0 && (
+                       <div>
+                          <h3 className={`text-[10px] font-bold uppercase ${theme.textMuted} mb-1 border-b pb-1 ${theme.divider}`}>Ports of Refuge</h3>
+                          <div className="max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                            {contingencies.map((c, idx) => (
+                               <div key={c.id} onClick={() => handleZoomTo(c.lat, c.lon)} className="cursor-pointer text-sm hover:text-emerald-600 py-1 transition-colors flex items-center">
+                                  <span className="font-mono text-[10px] mr-2 text-amber-500 bg-amber-500/10 px-1 rounded font-bold">Plan {String.fromCharCode(66+idx)}</span> 
+                                  {c.name || `Refuge ${c.id}`}
+                               </div>
+                            ))}
+                          </div>
+                       </div>
+                    )}
+                    {pois.length > 0 && (
+                       <div>
+                          <h3 className={`text-[10px] font-bold uppercase ${theme.textMuted} mb-1 border-b pb-1 ${theme.divider}`}>Points of Interest</h3>
+                          <div className="max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                            {pois.map(p => (
+                               <div key={p.id} onClick={() => handleZoomTo(p.lat, p.lon)} className="cursor-pointer text-sm hover:text-amber-500 py-1 transition-colors flex items-center">
+                                  <span className="font-mono text-[10px] mr-2 text-slate-400 bg-black/5 px-1 rounded">{p.type.charAt(0)}</span> 
+                                  {p.name}
+                               </div>
+                            ))}
+                          </div>
+                       </div>
+                    )}
+                 </div>
+              </CollapsibleSection>
+
+              {/* Points of Interest (POI) Database */}
+              <CollapsibleSection title="Points of Interest Database" icon={<i className="fa-solid fa-circle-info text-lg"></i>} className={theme.card} defaultOpen={false}>
+                  <div className="space-y-3">
+                     {pois.length === 0 && <div className="text-sm italic opacity-50">No POIs logged.</div>}
+                     {pois.map((poi, idx) => (
+                        <div key={poi.id} className={`p-3 border rounded-lg flex flex-col sm:flex-row gap-3 ${theme.divider}`}>
+                           <div className="flex items-center justify-center w-8 h-8 rounded bg-amber-500/20 text-amber-600 font-bold shrink-0">{poi.type.charAt(0)}</div>
+                           <div className="flex-1 grid grid-cols-1 sm:grid-cols-12 gap-3">
+                              <div className="sm:col-span-3">
+                                <label className={`block text-[10px] uppercase ${theme.textMuted}`}>Name / Suggested</label>
+                                <input type="text" value={poi.name} onChange={e => updatePoi(poi.id, 'name', e.target.value)} className={`w-full p-1.5 rounded text-sm border ${theme.input}`} />
+                              </div>
+                              <div className="sm:col-span-2">
+                                <label className={`block text-[10px] uppercase ${theme.textMuted}`}>Type</label>
+                                <select value={poi.type} onChange={e => updatePoi(poi.id, 'type', e.target.value)} className={`w-full p-1.5 rounded text-sm border ${theme.input}`}>
+                                   <option value="Light">Light</option>
+                                   <option value="Mark">Mark</option>
+                                   <option value="Other">Other</option>
+                                </select>
+                              </div>
+                              <div className="sm:col-span-3">
+                                 <label className={`block text-[10px] uppercase flex items-center ${theme.textMuted}`}><i className="fa-solid fa-link mr-1"></i> Related WP</label>
+                                 <select value={poi.relatedWpId || ''} onChange={e => updatePoi(poi.id, 'relatedWpId', e.target.value ? Number(e.target.value) : '')} className={`w-full p-1.5 rounded text-sm border ${theme.input}`}>
+                                    <option value="">- None -</option>
+                                    {activeWaypoints.map(w => <option key={w.id} value={w.id}>{w.name || `WP ${w.id}`}</option>)}
+                                 </select>
+                              </div>
+                              <div className="sm:col-span-2 grid grid-cols-2 sm:grid-cols-1 gap-2">
+                                 <div>
+                                   <label className={`block text-[10px] uppercase ${theme.textMuted}`}>Lat</label>
+                                   <input type="number" step="0.000001" value={poi.lat} onChange={e => updatePoi(poi.id, 'lat', parseFloat(e.target.value))} className={`w-full p-1.5 rounded text-sm border font-mono ${theme.input}`} />
+                                 </div>
+                                 <div>
+                                   <label className={`block text-[10px] uppercase ${theme.textMuted}`}>Lon</label>
+                                   <input type="number" step="0.000001" value={poi.lon} onChange={e => updatePoi(poi.id, 'lon', parseFloat(e.target.value))} className={`w-full p-1.5 rounded text-sm border font-mono ${theme.input}`} />
+                                 </div>
+                              </div>
+                              <div className="sm:col-span-5">
+                                 <label className={`block text-[10px] uppercase ${theme.textMuted}`}>Details</label>
+                                 <textarea value={poi.details} onChange={e => updatePoi(poi.id, 'details', e.target.value)} rows="2" className={`w-full p-1.5 rounded text-xs border ${theme.input}`}></textarea>
+                              </div>
+                              <div className="sm:col-span-1 flex items-center justify-end">
+                                 <button onClick={() => removePoi(poi.id)} className="opacity-50 hover:opacity-100 hover:text-red-500 p-2"><i className="fa-solid fa-trash"></i></button>
+                              </div>
+                           </div>
+                        </div>
+                     ))}
+                  </div>
+              </CollapsibleSection>
+
+              {/* The Nav Table */}
+              <CollapsibleSection 
+                title="Technical Nav-Table" 
+                icon={<i className="fa-solid fa-location-dot text-lg"></i>} 
+                className={`${theme.card} overflow-x-auto`} 
+                defaultOpen={true}
+                extraHeader={
+                  <div className="flex items-center space-x-2">
+                     <label className={`text-[10px] sm:text-xs font-bold uppercase ${theme.textMuted}`}>Scenario:</label>
+                     <select 
+                        value={activeScenario} 
+                        onChange={e => setActiveScenario(e.target.value)} 
+                        className={`p-1 sm:p-1.5 font-bold text-sm sm:text-base rounded border bg-blue-50/50 ${theme.input}`}
+                     >
+                        {scenarioOptions.map(opt => <option key={opt} value={opt}>Plan {opt}</option>)}
+                     </select>
+                  </div>
+                }
+              >
+                <div className="min-w-[800px]">
+                  {activeWaypoints.length === 0 && (
+                     <div className="p-8 text-center text-sm font-bold opacity-50 border border-dashed rounded-lg">
+                        No waypoints in Scenario {activeScenario}. Click "Plot WP" to add some!
+                     </div>
+                  )}
+                  {activeWaypoints.map((wp, index) => {
+                    const nextWp = activeWaypoints[index + 1];
+                    let navData = nextWp ? calculateNav(wp, nextWp) : null;
+                    const isDraftWarning = wp.depth < (vessel.draft + 1.0);
+                    
+                    const relatedPois = pois.filter(p => p.relatedWpId === wp.id);
+                    const relatedContingencies = contingencies.filter(c => c.relatedWpId === wp.id);
+
+                    return (
+                      <div 
+                        key={wp.id} 
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, index)}
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDrop(e, index)}
+                        onDragEnter={(e) => handleDragEnter(e, index)}
+                        className={`mb-4 border rounded-lg overflow-visible transition-all duration-200 ${dragOverIndex === index ? theme.dragActive : (isDraftWarning ? 'border-red-500 shadow-md shadow-red-500/20' : theme.divider)}`}
+                      >
+                        <div className={`p-3 flex justify-between items-center ${isDraftWarning ? 'bg-red-500/10' : 'bg-black/5'}`}>
+                          <div className="flex items-center space-x-3">
+                            <div className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 mr-1"><i className="fa-solid fa-grip-vertical text-lg"></i></div>
+                            <span className={`font-bold w-7 h-7 rounded-full flex items-center justify-center text-xs ${isNightMode ? 'bg-red-900 text-black' : 'bg-slate-800 text-white'}`}>
+                               {String(index + 1).padStart(2, '0')}
+                            </span>
+                            <input type="text" value={wp.name} onChange={e => updateWaypoint(wp.id, 'name', e.target.value)} placeholder="WP Name" className={`font-bold bg-transparent border-b border-transparent focus:border-current outline-none w-48`} />
+                            {isDraftWarning && <span className="flex items-center text-red-500 text-xs font-bold px-2 py-1 rounded bg-red-500/20"><i className="fa-solid fa-shield-halved mr-1"></i> Draft Warning</span>}
+                          </div>
+                          <button onClick={() => removeWaypoint(wp.id)} className="opacity-50 hover:opacity-100 hover:text-red-500"><i className="fa-solid fa-trash"></i></button>
+                        </div>
+
+                        <div className="p-3 grid grid-cols-6 gap-3">
+                          <div className="col-span-2 grid grid-cols-2 gap-2">
+                            <div><label className={`block text-[10px] uppercase ${theme.textMuted}`}>Lat</label><input type="number" step="0.000001" value={wp.lat} onChange={e => updateWaypoint(wp.id, 'lat', parseFloat(e.target.value))} className={`w-full p-1.5 rounded text-sm border font-mono ${theme.input}`} /></div>
+                            <div><label className={`block text-[10px] uppercase ${theme.textMuted}`}>Lon</label><input type="number" step="0.000001" value={wp.lon} onChange={e => updateWaypoint(wp.id, 'lon', parseFloat(e.target.value))} className={`w-full p-1.5 rounded text-sm border font-mono ${theme.input}`} /></div>
+                          </div>
+                          <div><label className={`block text-[10px] uppercase ${theme.textMuted}`}>Depth(m)</label><input type="number" step="0.1" value={wp.depth} onChange={e => updateWaypoint(wp.id, 'depth', parseFloat(e.target.value))} className={`w-full p-1.5 rounded text-sm border ${isDraftWarning ? 'bg-red-500/20 text-red-600 font-bold border-red-500' : theme.input}`} /></div>
+                          <div className="col-span-3 grid grid-cols-2 gap-2">
+                            <div><label className={`block text-[10px] uppercase ${theme.textMuted}`}>Visual / Light</label><input list="lights-list" value={wp.lightChar} onChange={e => updateWaypoint(wp.id, 'lightChar', e.target.value)} placeholder="e.g. Fl(2)10s" className={`w-full p-1.5 rounded text-sm border ${theme.input}`} /></div>
+                            <div><label className={`block text-[10px] uppercase ${theme.textMuted}`}>Notes</label><input type="text" value={wp.notes} onChange={e => updateWaypoint(wp.id, 'notes', e.target.value)} className={`w-full p-1.5 rounded text-sm border ${theme.input}`} /></div>
+                          </div>
+                        </div>
+
+                        {(relatedPois.length > 0 || relatedContingencies.length > 0) && (
+                           <div className={`px-3 py-2 flex flex-wrap gap-2 items-center border-t ${isNightMode ? 'bg-red-950/20 border-red-900/50' : 'bg-slate-50/80 border-slate-200'}`}>
+                              
+                              {relatedPois.length > 0 && (
+                                <div className="flex items-center space-x-2 mr-4">
+                                  <span className={`text-[10px] uppercase font-bold flex items-center ${theme.textMuted}`}><i className="fa-solid fa-circle-info mr-1"></i> POIs:</span>
+                                  {relatedPois.map(poi => (
+                                     <div key={poi.id} className="group relative">
+                                        <span className={`cursor-help px-2 py-1 rounded text-xs font-bold border ${isNightMode ? 'bg-zinc-900 border-amber-900 text-amber-500' : 'bg-white border-amber-200 text-amber-700'}`}>
+                                           [{poi.type}] {poi.name}
+                                        </span>
+                                        <div className={`hidden group-hover:block absolute z-50 p-3 text-xs rounded shadow-xl w-64 -top-1 left-full ml-2 border ${isNightMode ? 'bg-zinc-900 border-amber-900 text-amber-400' : 'bg-white border-amber-200 text-slate-800'}`}>
+                                           <div className="font-bold border-b pb-1 mb-1 border-current opacity-50">{poi.name} ({poi.type})</div>
+                                           <div>{poi.details || <span className="italic opacity-50">No details provided.</span>}</div>
+                                           <div className="text-[9px] mt-2 opacity-50 font-mono">Lat: {poi.lat.toFixed(6)} / Lon: {poi.lon.toFixed(6)}</div>
+                                        </div>
+                                     </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {relatedContingencies.length > 0 && (
+                                 <div className="flex items-center space-x-2">
+                                    <span className={`text-[10px] uppercase font-bold flex items-center ${theme.textMuted}`}><i className="fa-solid fa-anchor mr-1"></i> Escapes:</span>
+                                    {relatedContingencies.map(cont => {
+                                       const cIdx = contingencies.findIndex(c => c.id === cont.id);
+                                       const pLetter = String.fromCharCode(66 + cIdx);
+                                       return (
+                                         <div key={cont.id} className="group relative">
+                                            <span className={`cursor-help px-2 py-1 rounded text-xs font-bold border flex items-center ${cont.isActive ? 'bg-emerald-500 border-emerald-600 text-white' : (isNightMode ? 'bg-zinc-900 border-emerald-900 text-emerald-500' : 'bg-white border-emerald-200 text-emerald-700')}`}>
+                                               {cont.isActive && <i className="fa-solid fa-circle-check mr-1"></i>} Plan {pLetter}: {cont.name || 'Refuge'}
+                                            </span>
+                                            <div className={`hidden group-hover:block absolute z-50 p-3 text-xs rounded shadow-xl w-64 -top-1 left-full ml-2 border ${isNightMode ? 'bg-zinc-900 border-emerald-900 text-emerald-400' : 'bg-white border-emerald-200 text-slate-800'}`}>
+                                               <div className="font-bold border-b pb-1 mb-1 border-current opacity-50">Plan {pLetter}: {cont.name}</div>
+                                               <div className="font-bold text-[10px] uppercase mt-1">Abort Point/Condition:</div>
+                                               <div className="mb-2 text-amber-600">{cont.abortPoint || <span className="italic opacity-50">None set.</span>}</div>
+                                               <div className="font-bold text-[10px] uppercase">Refuge Plan:</div>
+                                               <div>{cont.details || <span className="italic opacity-50">No details provided.</span>}</div>
+                                            </div>
+                                         </div>
+                                       )
+                                    })}
+                                 </div>
+                              )}
+                           </div>
+                        )}
+
+                        {navData && (
+                          <div className={`p-3 border-t flex flex-wrap items-center justify-between gap-4 ${isNightMode ? 'bg-black border-red-900/50' : 'bg-slate-50 border-slate-200'}`}>
+                            <div className="flex items-center space-x-6">
+                              <div className="flex flex-col"><span className={`text-[10px] uppercase font-bold ${theme.textMuted}`}>Distance</span><span className="font-mono font-bold text-lg">{navData.distance} <span className="text-xs font-normal">NM</span></span></div>
+                              <div className="flex flex-col"><span className={`text-[10px] uppercase font-bold ${theme.textMuted}`}>Bearing (COG)</span><span className="font-mono font-bold text-lg">{navData.bearing}° <span className="text-xs font-normal">T</span></span></div>
+                              
+                              <div className="flex space-x-2 bg-black/5 p-1 rounded border border-transparent hover:border-slate-300">
+                                <div className="flex flex-col w-16"><span className={`text-[9px] uppercase ${theme.textMuted}`}>Tide Set(°T)</span><input type="number" value={wp.tideSet} onChange={e => updateWaypoint(wp.id, 'tideSet', e.target.value)} className={`p-1 rounded text-xs font-mono border ${theme.input}`} /></div>
+                                <div className="flex flex-col w-16"><span className={`text-[9px] uppercase ${theme.textMuted}`}>Tide Rate(kt)</span><input type="number" step="0.1" value={wp.tideRate} onChange={e => updateWaypoint(wp.id, 'tideRate', e.target.value)} className={`p-1 rounded text-xs font-mono border ${theme.input}`} /></div>
+                              </div>
+
+                              <div className="flex flex-col bg-blue-600/10 px-3 py-1 rounded border border-blue-500/30">
+                                <span className={`text-[10px] uppercase font-bold text-blue-600 ${isNightMode ? 'text-blue-400' : ''}`}>Course To Steer (CTS)</span>
+                                <span className={`font-mono font-bold text-xl text-blue-700 ${isNightMode ? 'text-blue-400' : ''}`}>{navData.cts}° <span className="text-xs font-normal">T</span></span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </CollapsibleSection>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+
+
+</body>
+</html>

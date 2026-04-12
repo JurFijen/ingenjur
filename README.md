@@ -6,3 +6,5 @@
 * [PlotrPlanPro](https://jurfijen.github.io/ingenjur/PlotrPlanPro.html)
 * [PlotrTidesPro 26W13 Makkum](https://jurfijen.github.io/ingenjur/PlotrTidesPro26W13Makkum.html)
 * [StravaOwn](https://jurfijen.github.io/ingenjur/StravaOwn.html)
+
+* [Test](https://jurfijen.github.io/ingenjur/test.html)

@@ -84,7 +84,7 @@
 <body class="bg-gray-100 dark:bg-gray-900 transition-colors duration-300">
 
     <!-- Status Melding -->
-    <div id="info" class="info-box opacity-0 bg-white dark:bg-gray-800 px-4 py-2 rounded-full shadow-md">
+    <div id="info" class="info-box opacity-0 bg-white dark:bg-gray-800 px-4 py-2 rounded-full shadow-md border dark:border-gray-700">
         <span id="status-text" class="text-sm font-medium text-gray-700 dark:text-gray-200">Locatie zoeken...</span>
     </div>
 
@@ -111,53 +111,68 @@
             </button>
         </div>
 
-        <!-- Kaartlagen Selectie -->
-        <div class="mb-6">
-            <h3 class="text-sm font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-3 border-b dark:border-gray-700 pb-2">Kaartlaag</h3>
-            <div class="flex flex-col gap-3">
+        <div class="overflow-y-auto flex-1 pb-4">
+            <!-- Instellingen (Auto Center) -->
+            <div class="mb-6">
+                <h3 class="text-sm font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-3 border-b dark:border-gray-700 pb-2">Instellingen</h3>
                 <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-800 dark:text-gray-200 hover:text-blue-500 transition-colors">
-                    <input type="radio" name="layer" value="osm" class="layer-radio w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600" checked>
-                    Standaard (OSM)
-                </label>
-                <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-800 dark:text-gray-200 hover:text-blue-500 transition-colors">
-                    <input type="radio" name="layer" value="sat" class="layer-radio w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600">
-                    Satelliet
-                </label>
-                <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-800 dark:text-gray-200 hover:text-blue-500 transition-colors">
-                    <input type="radio" name="layer" value="naut" class="layer-radio w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600">
-                    Nautisch (OpenSeaMap)
+                    <input type="checkbox" id="auto-center-toggle" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600">
+                    Automatisch inzoomen (elke 5s)
                 </label>
             </div>
-        </div>
 
-        <!-- 1. Punt prikken -->
-        <button id="pick-point-btn" class="w-full bg-blue-500 text-white font-medium py-2 px-4 rounded-lg hover:bg-blue-600 mb-6 transition-colors flex items-center justify-center gap-2 shadow-sm">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /></svg>
-            Punt prikken
-        </button>
-
-        <!-- 2. Locatie zoeken -->
-        <div class="mb-6">
-            <h3 class="text-sm font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-3 border-b dark:border-gray-700 pb-2">Zoek Locatie</h3>
-            <div class="flex gap-2">
-                <input type="text" id="search-input" class="w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="bijv. Parijs">
-                <button id="search-btn" class="bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 px-3 py-2 rounded-lg text-gray-800 dark:text-white transition-colors border dark:border-gray-600" title="Zoeken">
-                    🔍
-                </button>
+            <!-- Kaartlagen Selectie -->
+            <div class="mb-6">
+                <h3 class="text-sm font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-3 border-b dark:border-gray-700 pb-2">Kaartlaag</h3>
+                <div class="flex flex-col gap-3">
+                    <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-800 dark:text-gray-200 hover:text-blue-500 transition-colors">
+                        <input type="radio" name="layer" value="osm" class="layer-radio w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600" checked>
+                        Standaard (OSM)
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-800 dark:text-gray-200 hover:text-blue-500 transition-colors">
+                        <input type="radio" name="layer" value="sat" class="layer-radio w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600">
+                        Satelliet
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-800 dark:text-gray-200 hover:text-blue-500 transition-colors">
+                        <input type="radio" name="layer" value="naut" class="layer-radio w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600">
+                        Nautisch (OpenSeaMap)
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer text-sm text-gray-800 dark:text-gray-200 hover:text-blue-500 transition-colors">
+                        <input type="radio" name="layer" value="sat_naut" class="layer-radio w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600">
+                        Satelliet + Nautisch
+                    </label>
+                </div>
             </div>
-        </div>
 
-        <!-- 3. Locatie opslaan -->
-        <button id="save-location-btn" class="w-full bg-green-500 text-white font-medium py-2 px-4 rounded-lg hover:bg-green-600 mb-6 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
-            💾 Sla laatste zoekopdracht op
-        </button>
+            <!-- 1. Punt prikken -->
+            <button id="pick-point-btn" class="w-full bg-blue-500 text-white font-medium py-2 px-4 rounded-lg hover:bg-blue-600 mb-6 transition-colors flex items-center justify-center gap-2 shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /></svg>
+                Punt prikken
+            </button>
 
-        <!-- 4. Opgeslagen locaties -->
-        <div class="flex-1 overflow-y-auto mt-2">
-            <h3 class="text-sm font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-3 border-b dark:border-gray-700 pb-2">Opgeslagen Locaties</h3>
-            <ul id="saved-locations-list" class="space-y-2">
-                <!-- Wordt dynamisch gevuld -->
-            </ul>
+            <!-- 2. Locatie zoeken -->
+            <div class="mb-6">
+                <h3 class="text-sm font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-3 border-b dark:border-gray-700 pb-2">Zoek Locatie</h3>
+                <div class="flex gap-2">
+                    <input type="text" id="search-input" class="w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="bijv. Parijs">
+                    <button id="search-btn" class="bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 px-3 py-2 rounded-lg text-gray-800 dark:text-white transition-colors border dark:border-gray-600" title="Zoeken">
+                        🔍
+                    </button>
+                </div>
+            </div>
+
+            <!-- 3. Locatie opslaan -->
+            <button id="save-location-btn" class="w-full bg-green-500 text-white font-medium py-2 px-4 rounded-lg hover:bg-green-600 mb-6 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                💾 Sla laatste zoekopdracht op
+            </button>
+
+            <!-- 4. Opgeslagen locaties -->
+            <div class="mt-2">
+                <h3 class="text-sm font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider mb-3 border-b dark:border-gray-700 pb-2">Opgeslagen Locaties</h3>
+                <ul id="saved-locations-list" class="space-y-2">
+                    <!-- Wordt dynamisch gevuld -->
+                </ul>
+            </div>
         </div>
     </div>
 
@@ -186,6 +201,8 @@
         let userMarker;
         let userCircle;
         let firstUpdate = true;
+        let searchedMarker; // Voor de opgemeten locatie
+        let distanceLine; // Visuele lijn voor afstand
         
         // Status elementen
         const statusEl = document.getElementById('info');
@@ -195,6 +212,7 @@
         let isPickingPoint = false;
         let lastSearchedLocation = null;
         let savedLocations = JSON.parse(localStorage.getItem('savedLocations') || '[]');
+        let isAutoCenterActive = false;
 
         // Thema state
         let isDark = false;
@@ -213,6 +231,15 @@
             'naut_dark': L.layerGroup([
                 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }),
                 L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenSeaMap' })
+            ]),
+            // --- Nieuwe Satelliet + Nautische combinaties ---
+            'sat_naut_light': L.layerGroup([
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: '© Esri' }),
+                L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenSeaMap' })
+            ]),
+            'sat_naut_dark': L.layerGroup([
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: '© Esri', className: 'dark-mode-tiles' }),
+                L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenSeaMap' })
             ])
         };
 
@@ -230,7 +257,7 @@
                     const coords = `${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`;
                     navigator.clipboard.writeText(coords).then(() => {
                         showStatus(`Coördinaten gekopieerd: ${coords}`);
-                        togglePickingPoint(); // Zet na succesvolle klik uit
+                        togglePickingPoint(); 
                         setTimeout(() => statusEl.classList.add('opacity-0'), 3000);
                     }).catch(() => {
                         showStatus('Kopiëren mislukt', true);
@@ -252,15 +279,12 @@
             updateMapLayer();
         });
 
-        // Event listeners voor de nieuwe radio buttons
         const layerRadios = document.querySelectorAll('.layer-radio');
         layerRadios.forEach(radio => {
             radio.addEventListener('change', (e) => {
                 if (e.target.checked) {
                     currentLayerType = e.target.value;
                     updateMapLayer();
-                    // Sluit het menu optioneel na selectie (verwijder dit als je het menu open wilt houden)
-                    // sideMenu.classList.add('-translate-x-full'); 
                 }
             });
         });
@@ -276,6 +300,23 @@
             sideMenu.classList.add('-translate-x-full');
         });
 
+        // --- AUTO CENTER LOGICA ---
+        document.getElementById('auto-center-toggle').addEventListener('change', (e) => {
+            isAutoCenterActive = e.target.checked;
+            if (isAutoCenterActive && userMarker) {
+                map.flyTo(userMarker.getLatLng(), Math.max(map.getZoom(), 16));
+                showStatus('Auto-centreren ingeschakeld');
+                setTimeout(() => statusEl.classList.add('opacity-0'), 2000);
+            }
+        });
+
+        // Interval dat elke 5 seconden uitvoert
+        setInterval(() => {
+            if (isAutoCenterActive && userMarker) {
+                map.panTo(userMarker.getLatLng(), { animate: true, duration: 1.0 });
+            }
+        }, 5000);
+
         // --- PUNT PRIKKEN LOGICA ---
         let pickPointBtn = document.getElementById('pick-point-btn');
         let mapDiv = document.getElementById('map');
@@ -288,7 +329,7 @@
                 pickPointBtn.classList.replace('hover:bg-blue-600', 'hover:bg-yellow-600');
                 pickPointBtn.innerHTML = '🛑 Annuleer prikken';
                 showStatus('Klik op de kaart om coördinaten te kopiëren...');
-                sideMenu.classList.add('-translate-x-full'); // Sluit menu om te prikken
+                sideMenu.classList.add('-translate-x-full'); 
             } else {
                 mapDiv.classList.remove('crosshair-cursor-enabled');
                 pickPointBtn.classList.replace('bg-yellow-500', 'bg-blue-500');
@@ -299,7 +340,7 @@
         }
         pickPointBtn.addEventListener('click', togglePickingPoint);
 
-        // --- ZOEKEN LOGICA (Nominatim Geocoding) ---
+        // --- ZOEKEN & AFSTAND METEN LOGICA ---
         async function performSearch() {
             const query = document.getElementById('search-input').value.trim();
             if (!query) return;
@@ -314,13 +355,49 @@
                     const lat = parseFloat(result.lat);
                     const lon = parseFloat(result.lon);
                     const name = result.display_name.split(',')[0]; 
+                    const targetLatLng = L.latLng(lat, lon);
 
-                    map.flyTo([lat, lon], 12);
                     lastSearchedLocation = { name: name, lat: lat, lon: lon };
-                    
-                    showStatus(`Gevonden: ${name}`);
-                    setTimeout(() => statusEl.classList.add('opacity-0'), 3000);
                     sideMenu.classList.add('-translate-x-full'); 
+
+                    // Verwijder oude markering en lijn
+                    if (searchedMarker) map.removeLayer(searchedMarker);
+                    if (distanceLine) map.removeLayer(distanceLine);
+
+                    // Voeg marker toe aan het zoekresultaat
+                    searchedMarker = L.marker(targetLatLng).addTo(map);
+
+                    // Afstand berekenen
+                    let distanceText = "";
+                    if (userMarker) {
+                        const userLatLng = userMarker.getLatLng();
+                        const distMeters = userLatLng.distanceTo(targetLatLng);
+
+                        if (distMeters > 1000) {
+                            distanceText = ` (Afstand: ${(distMeters / 1000).toFixed(1)} km)`;
+                        } else {
+                            distanceText = ` (Afstand: ${Math.round(distMeters)} m)`;
+                        }
+
+                        // Teken visuele lijn
+                        distanceLine = L.polyline([userLatLng, targetLatLng], {
+                            color: '#ef4444', // Tailwind red-500
+                            weight: 3,
+                            dashArray: '10, 10',
+                            opacity: 0.8
+                        }).addTo(map);
+
+                        searchedMarker.bindPopup(`<b>${name}</b><br>${distanceText}`).openPopup();
+
+                        // Zoom uit om beide punten te laten zien
+                        map.fitBounds(L.latLngBounds(userLatLng, targetLatLng), { padding: [50, 50] });
+                    } else {
+                        map.flyTo(targetLatLng, 12);
+                        searchedMarker.bindPopup(`<b>${name}</b>`).openPopup();
+                    }
+                    
+                    showStatus(`Gevonden: ${name}${distanceText}`);
+                    setTimeout(() => statusEl.classList.add('opacity-0'), 5000);
                 } else {
                     showStatus('Locatie niet gevonden', true);
                     setTimeout(() => statusEl.classList.add('opacity-0'), 3000);
@@ -353,8 +430,9 @@
                 span.innerText = loc.name;
                 span.className = 'flex-1 truncate pr-2';
                 span.onclick = () => {
-                    map.flyTo([loc.lat, loc.lon], 12);
-                    sideMenu.classList.add('-translate-x-full');
+                    // Zet de zoekbalk op deze waarde en voer zoekopdracht opnieuw uit om afstand te updaten
+                    document.getElementById('search-input').value = loc.name;
+                    performSearch();
                 };
 
                 const deleteBtn = document.createElement('button');
@@ -433,6 +511,11 @@
                 userMarker.setLatLng(latlng);
                 userCircle.setLatLng(latlng);
                 userCircle.setRadius(accuracy);
+
+                // Update de afstandslijn direct mee als we onszelf verplaatsen
+                if (distanceLine && lastSearchedLocation) {
+                    distanceLine.setLatLngs([latlng, [lastSearchedLocation.lat, lastSearchedLocation.lon]]);
+                }
             } else {
                 userCircle = L.circle(latlng, { radius: accuracy, weight: 1, color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.15 }).addTo(map);
                 userMarker = L.marker(latlng, { icon: locationIcon }).addTo(map);
@@ -449,7 +532,7 @@
 
         document.getElementById('recenter-btn').addEventListener('click', () => {
             if (userMarker) {
-                map.flyTo(userMarker.getLatLng(), 17);
+                map.flyTo(userMarker.getLatLng(), Math.max(map.getZoom(), 16));
             } else {
                 startTracking();
             }

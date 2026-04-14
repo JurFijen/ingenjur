@@ -1,4 +1,3 @@
-
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -11,7 +10,7 @@
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-  <!-- Leaflet CSS & JS -->å
+  <!-- Leaflet CSS & JS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -132,7 +131,7 @@
       }
     ];
 
-    // Reusable Collapsible Wrapper (Moved outside App to prevent re-mounting and focus loss on keystrokes)
+    // Reusable Collapsible Wrapper
     const CollapsibleSection = ({ title, icon, children, className, defaultOpen = true, extraHeader }) => {
         const [isOpen, setIsOpen] = useState(defaultOpen);
         return (
@@ -177,6 +176,9 @@
       const [tempPin, setTempPin] = useState(null);
       const [isPrinting, setIsPrinting] = useState(false);
       
+      // Map Additions
+      const [isMapExpanded, setIsMapExpanded] = useState(false);
+      
       // Scenarios State
       const [activeScenario, setActiveScenario] = useState(initialState?.activeScenario ?? 'A');
       const scenarioOptions = Array.from({length: 26}, (_, i) => String.fromCharCode(65 + i));
@@ -186,7 +188,7 @@
       const [dragOverIndex, setDragOverIndex] = useState(null);
       
       // Map Interactive State
-      const [plotMode, setPlotMode] = useState('off'); // 'off', 'wp', 'poi', 'refuge'
+      const [plotMode, setPlotMode] = useState('off'); // 'off', 'wp', 'poi', 'refuge', 'info10', 'info100'
       const [isSatellite, setIsSatellite] = useState(false);
       const [showDepth, setShowDepth] = useState(true);
       
@@ -221,6 +223,32 @@
       const refugeLinesRef = useRef([]);
       const mapLayersRef = useRef({});
       const handleMapClickRef = useRef(null);
+
+      // Uitgebreide copyToClipboard met aanpasbaar succesbericht
+      const copyToClipboard = (text, successMsg = 'Gekopieerd naar klembord!') => {
+          const textArea = document.createElement("textarea");
+          textArea.value = text;
+          document.body.appendChild(textArea);
+          textArea.select();
+          try {
+              document.execCommand('copy');
+              setSaveStatus(successMsg);
+              setTimeout(() => setSaveStatus(''), 4000);
+          } catch (err) {
+              console.error('Kopiëren mislukt', err);
+          }
+          document.body.removeChild(textArea);
+      };
+
+      // Zorg dat de kaart goed mee schaalt wanneer isMapExpanded wijzigt
+      useEffect(() => {
+        if (mapInstance.current) {
+          // Korte delay om te wachten tot de DOM transitie is afgerond
+          setTimeout(() => {
+            mapInstance.current.invalidateSize();
+          }, 300);
+        }
+      }, [isMapExpanded]);
 
       // Sync Self-Modifying HTML Function
       const syncHTML = async () => {
@@ -259,7 +287,6 @@
         const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
         
         try {
-          // Use modern File System Access API if available to overwrite the actual file
           if (window.showSaveFilePicker) {
             const fileHandle = await window.showSaveFilePicker({
               suggestedName: 'PlotrPlan_Pro.html',
@@ -270,7 +297,6 @@
             await writable.close();
             setSaveStatus('App Synced!');
           } else {
-            // Fallback for older browsers (direct download)
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
             a.download = 'PlotrPlan_Pro.html'; 
@@ -283,11 +309,9 @@
         } catch (error) {
           if (error.name !== 'AbortError') console.error('HTML sync failed:', error);
         }
-
         setTimeout(() => setSaveStatus(''), 3000);
       };
 
-      // Listen for print dialog close to restore interactive view
       useEffect(() => {
         const handleAfterPrint = () => setIsPrinting(false);
         window.addEventListener('afterprint', handleAfterPrint);
@@ -332,7 +356,6 @@
         });
         md += `\n`;
 
-        // Complete Markdown Data Tables for all Scenarios with waypoints
         ['A', 'B', 'C'].forEach(sc => {
            const scWaypoints = waypoints.filter(w => w.scenario === sc);
            if (scWaypoints.length === 0) return;
@@ -369,15 +392,11 @@
         return { md, filenameBase };
       };
 
-      // Export to Markdown with Embedded Screenshots
       const handleExportMarkdown = async () => {
         const { md, filenameBase } = generateMarkdownText();
-
-        // Trigger Markdown Download with User-Defined Location
         const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
         
         try {
-          // Use modern File System Access API if available
           if (window.showSaveFilePicker) {
             const fileHandle = await window.showSaveFilePicker({
               suggestedName: `${filenameBase}.md`,
@@ -391,7 +410,6 @@
             await writable.close();
             setSaveStatus('Markdown Saved!');
           } else {
-            // Fallback for older browsers (direct download)
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
             a.download = `${filenameBase}.md`;
@@ -402,15 +420,11 @@
             setSaveStatus('Markdown Exported!');
           }
         } catch (error) {
-          // Ignore if user cancelled the save dialog
-          if (error.name !== 'AbortError') {
-            console.error('File save failed:', error);
-          }
+          if (error.name !== 'AbortError') console.error('File save failed:', error);
         }
         setTimeout(() => setSaveStatus(''), 3000);
       };
 
-      // Derived States
       const isWeatherStale = useMemo(() => {
         if (!weather.issueTime) return false;
         const ageHours = (Date.now() - new Date(weather.issueTime).getTime()) / 3600000;
@@ -419,14 +433,14 @@
 
       const activeWaypoints = useMemo(() => waypoints.filter(w => w.scenario === activeScenario), [waypoints, activeScenario]);
 
-      // Map Zoom Function
       const handleZoomTo = (lat, lon) => {
         if (mapInstance.current) {
+          // Sluit de fullscreen view indien geopend voor betere oriëntatie op lijst
+          if(isMapExpanded) setIsMapExpanded(false); 
           mapInstance.current.flyTo([lat, lon], 14, { animate: true, duration: 1 });
         }
       };
 
-      // Math Functions for Nav Table
       const calculateNav = (wp1, wp2) => {
         const R = 3440; // Nautical Miles
         const dLat = (wp2.lat - wp1.lat) * Math.PI / 180;
@@ -458,7 +472,6 @@
         return { distance: distance.toFixed(1), bearing: Math.round(bearing), cts: Math.round(cts) };
       };
 
-      // State Handlers (Nu voorzien van veilige "prev" state updates en gecombineerde coördinaat updaters)
       const addWaypoint = () => {
         setWaypoints(prev => {
           const newId = prev.length > 0 ? Math.max(...prev.map(w => w.id)) + 1 : 1;
@@ -496,7 +509,6 @@
         }
       };
 
-      // Drag and Drop Logic
       const handleDragStart = (e, index) => {
         setDragIndex(index);
         e.dataTransfer.effectAllowed = "move";
@@ -522,7 +534,7 @@
 
       const togglePlotMode = (mode) => setPlotMode(prev => prev === mode ? 'off' : mode);
 
-      // Map Click Logic
+      // Map Click Logic (Aangepast voor Overpass API Info knoppen)
       useEffect(() => {
         handleMapClickRef.current = (e) => {
           if (plotMode === 'off') return;
@@ -563,13 +575,45 @@
             }]);
           } else if (plotMode === 'pin') {
             setTempPin({ lat: parseFloat(lat.toFixed(6)), lon: parseFloat(lng.toFixed(6)) });
+          } else if (plotMode === 'info10' || plotMode === 'info100') {
+            // Overpass API koppeling voor nautische informatie
+            const radius = plotMode === 'info10' ? 10 : 100;
+            setSaveStatus(`Bezig met ophalen info (${radius}m)...`);
+            
+            // Query zoekt naar Nodes of Ways met een seamark:type tag binnen radius
+            const query = `[out:json];(node(around:${radius},${lat},${lng})["seamark:type"];way(around:${radius},${lat},${lng})["seamark:type"];);out tags;`;
+            
+            fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`)
+              .then(res => res.json())
+              .then(data => {
+                  if (data.elements && data.elements.length > 0) {
+                      let infoText = `Nautische info binnen ${radius}m van ${lat.toFixed(5)}, ${lng.toFixed(5)}:\n\n`;
+                      data.elements.forEach((el, i) => {
+                          if (el.tags) {
+                              infoText += `[Object ${i+1}] ${el.tags['seamark:name'] || el.tags.name || el.tags['seamark:type'] || 'Onbekend'}\n`;
+                              for (const [key, value] of Object.entries(el.tags)) {
+                                  infoText += `  - ${key}: ${value}\n`;
+                              }
+                              infoText += '\n';
+                          }
+                      });
+                      copyToClipboard(infoText, `Info (${data.elements.length} objecten) gekopieerd!`);
+                  } else {
+                      setSaveStatus(`Geen nautische objecten gevonden binnen ${radius}m.`);
+                      setTimeout(() => setSaveStatus(''), 3000);
+                  }
+              })
+              .catch(err => {
+                  console.error(err);
+                  setSaveStatus('Fout bij ophalen informatie via Overpass API.');
+                  setTimeout(() => setSaveStatus(''), 3000);
+              });
           }
         };
       }, [plotMode, waypoints, activeWaypoints, pois, contingencies, activeScenario]);
 
-      // Leaflet Map Initialization
       useEffect(() => {
-        if (isPrinting) return; // Do not initialize map in print mode
+        if (isPrinting) return; 
         
         if (window.L && !mapInstance.current && mapRef.current) {
           const map = window.L.map(mapRef.current).setView([53.056, 5.398], 10);
@@ -598,7 +642,6 @@
         return () => { if (mapInstance.current) { mapInstance.current.remove(); mapInstance.current = null; } };
       }, [isPrinting]);
 
-      // Handle Base Map Toggles
       useEffect(() => {
         if (!mapInstance.current || !mapLayersRef.current.osm || isPrinting) return;
         const map = mapInstance.current;
@@ -619,7 +662,6 @@
         }
       }, [isSatellite, showDepth, isPrinting]);
 
-      // Handle Map Markers and Lines
       useEffect(() => {
         if (!mapInstance.current || !window.L || isPrinting) return;
         const map = mapInstance.current;
@@ -640,10 +682,8 @@
             iconSize: [24, 24], iconAnchor: [12, 12]
           });
           
-          // Maak waypoint markering versleepbaar
           const marker = window.L.marker([wp.lat, wp.lon], { icon: wpIcon, draggable: true }).addTo(map);
           
-          // Update status wanneer drag-and-drop is voltooid
           marker.on('dragend', (e) => {
             const { lat, lng } = e.target.getLatLng();
             updateWaypointCoords(wp.id, parseFloat(lat.toFixed(6)), parseFloat(lng.toFixed(6)));
@@ -669,10 +709,8 @@
             iconSize: [20, 20], iconAnchor: [10, 10]
           });
           
-          // Maak POI markering versleepbaar
           const marker = window.L.marker([poi.lat, poi.lon], { icon: poiIcon, draggable: true }).addTo(map);
           
-          // Update status wanneer drag-and-drop is voltooid
           marker.on('dragend', (e) => {
             const { lat, lng } = e.target.getLatLng();
             updatePoiCoords(poi.id, parseFloat(lat.toFixed(6)), parseFloat(lng.toFixed(6)));
@@ -694,10 +732,8 @@
               iconSize: [26, 26], iconAnchor: [13, 13]
             });
             
-            // Maak uitwijkhaven markering versleepbaar
             const marker = window.L.marker([cont.lat, cont.lon], { icon: contIcon, draggable: true }).addTo(map);
             
-            // Update status wanneer drag-and-drop is voltooid
             marker.on('dragend', (e) => {
               const { lat, lng } = e.target.getLatLng();
               updateContingencyCoords(cont.id, parseFloat(lat.toFixed(6)), parseFloat(lng.toFixed(6)));
@@ -737,7 +773,6 @@
 
       }, [activeWaypoints, pois, contingencies, isNightMode, tempPin, isPrinting]);
 
-      // Theming Classes
       const theme = {
         bg: isNightMode ? 'bg-black' : 'bg-slate-100',
         text: isNightMode ? 'text-red-500' : 'text-slate-800',
@@ -754,25 +789,10 @@
         dragActive: isNightMode ? 'bg-red-900/20 border-red-500 border-dashed' : 'bg-blue-50/50 border-blue-400 border-dashed'
       };
 
-      const copyToClipboard = (text) => {
-          const textArea = document.createElement("textarea");
-          textArea.value = text;
-          document.body.appendChild(textArea);
-          textArea.select();
-          try {
-              document.execCommand('copy');
-              setSaveStatus('Copied to Clipboard!');
-              setTimeout(() => setSaveStatus(''), 2000);
-          } catch (err) {
-              console.error('Copy failed', err);
-          }
-          document.body.removeChild(textArea);
-      };
-
-      // --- PRINT VIEW RENDER ---
       if (isPrinting) {
         return (
           <div className="bg-white text-black p-8 font-sans max-w-5xl mx-auto">
+            {/* Print weergave behouden exact zoals hij was... */}
             <div className="text-center mb-10">
               <h1 className="text-4xl font-bold uppercase tracking-widest">{tripName || 'Passage Plan'}</h1>
               <p className="text-gray-500 mt-2">Generated by PlotrPlan Pro on {new Date().toLocaleDateString()}</p>
@@ -884,7 +904,6 @@
                -- End of Passage Plan --
             </div>
             
-            {/* Cancel Button visible on screen but hidden in print */}
             <div className="mt-8 text-center print:hidden">
                <button onClick={() => setIsPrinting(false)} className="px-6 py-2 bg-slate-800 text-white font-bold rounded hover:bg-slate-700">
                   Return to Interactive App
@@ -893,7 +912,6 @@
           </div>
         );
       }
-      // --- END PRINT VIEW ---
 
       return (
         <div className={`min-h-screen p-2 md:p-6 transition-colors duration-300 ${theme.bg} ${theme.text} font-sans`}>
@@ -901,9 +919,7 @@
             <option value="Fl.(4)W. 30s" /> <option value="Fl.R. 5s" /> <option value="Q.G." /> <option value="Iso.4s" />
           </datalist>
 
-          {/* Top Navigation Bar & Trip Name */}
           <div className={`max-w-7xl mx-auto flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6 p-4 rounded-xl ${theme.card}`}>
-            
             <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
               <div className="flex items-center space-x-3">
                 <i className="fa-solid fa-compass text-3xl"></i>
@@ -976,10 +992,7 @@
           </div>
 
           <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
-            
-            {/* LEFT COLUMN: Appraisal & Context */}
             <div className="lg:col-span-4 space-y-6">
-              
               <CollapsibleSection title="Vessel & Crew" icon={<i className="fa-solid fa-ship text-lg"></i>} className={theme.card} defaultOpen={true}>
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <div><label className={`block text-xs uppercase mb-1 ${theme.textMuted}`}>Draft (m)</label><input type="number" step="0.1" value={vessel.draft} onChange={e => setVessel({...vessel, draft: parseFloat(e.target.value)})} className={`w-full p-2 rounded text-sm border ${theme.input}`} /></div>
@@ -1082,7 +1095,6 @@
                  </div>
               </CollapsibleSection>
 
-              {/* Maritime Quick Links (New) */}
               <CollapsibleSection title="Maritime Quick Links" icon={<i className="fa-solid fa-link text-blue-500 text-lg"></i>} className={theme.card} defaultOpen={false}>
                  <div className="space-y-3">
                    {quickLinksDB.map((region, i) => (
@@ -1112,13 +1124,9 @@
                    ))}
                  </div>
               </CollapsibleSection>
-
             </div>
 
-            {/* RIGHT COLUMN: Execution & Navigation Table */}
             <div className="lg:col-span-8 space-y-6">
-              
-              {/* Scenario Summary Panel */}
               <div className="grid grid-cols-3 gap-3">
                  {['A', 'B', 'C'].map(sc => {
                     const wps = waypoints.filter(w => w.scenario === sc);
@@ -1144,7 +1152,6 @@
                  })}
               </div>
 
-              {/* Interactive Chart Area (Kept strictly visible to prevent Leaflet resize bugs) */}
               <section className={`p-5 rounded-xl ${theme.card}`}>
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                   <div className="flex items-center space-x-2">
@@ -1174,22 +1181,55 @@
                       {plotMode === 'refuge' ? <i className="fa-solid fa-crosshairs animate-pulse"></i> : <i className="fa-solid fa-life-ring"></i>}
                       <span className="hidden sm:inline">{plotMode === 'refuge' ? 'Plotting...' : 'Plot Refuge'}</span>
                     </button>
-                    <button onClick={() => togglePlotMode('pin')} className={`px-3 py-1.5 rounded flex items-center space-x-1.5 text-xs font-bold transition-all ${plotMode === 'pin' ? theme.btnPinActive : theme.btnPrimary}`}>
-                      {plotMode === 'pin' ? <i className="fa-solid fa-crosshairs animate-pulse"></i> : <i className="fa-solid fa-thumbtack"></i>}
-                      <span className="hidden sm:inline">{plotMode === 'pin' ? 'Pinning...' : 'Drop Pin'}</span>
-                    </button>
                   </div>
                 </div>
                 
                 {plotMode !== 'off' && (
-                   <div className={`mb-3 p-2 text-sm font-bold text-center rounded ${plotMode === 'wp' ? (isNightMode ? 'bg-red-900/20 text-red-400' : 'bg-green-50 text-green-700') : (plotMode === 'poi' ? 'bg-amber-500/20 text-amber-700' : (plotMode === 'pin' ? (isNightMode ? 'bg-purple-900/30 text-purple-400' : 'bg-purple-50 text-purple-700') : 'bg-emerald-500/20 text-emerald-700'))}`}>
-                     Click anywhere on the chart grid below to drop a new {plotMode === 'wp' ? `Waypoint (Scenario ${activeScenario})` : (plotMode === 'poi' ? 'Point of Interest' : (plotMode === 'pin' ? 'Temporary Pin' : 'Port of Refuge Contingency'))}. <br/><span className="text-xs font-normal opacity-75">Je kunt bestaande markeringen op de kaart ook direct verslepen.</span>
+                   <div className={`mb-3 p-2 text-sm font-bold text-center rounded ${plotMode === 'wp' ? (isNightMode ? 'bg-red-900/20 text-red-400' : 'bg-green-50 text-green-700') : (plotMode === 'poi' ? 'bg-amber-500/20 text-amber-700' : (plotMode === 'pin' ? (isNightMode ? 'bg-purple-900/30 text-purple-400' : 'bg-purple-50 text-purple-700') : (plotMode.includes('info') ? 'bg-blue-500/20 text-blue-700' : 'bg-emerald-500/20 text-emerald-700')))}`}>
+                     {plotMode.includes('info') 
+                        ? `Klik op de kaart om nautische info op te vragen (straal van ${plotMode === 'info10' ? '10m' : '100m'}). Info wordt direct gekopieerd.` 
+                        : `Click anywhere on the chart grid below to drop a new ${plotMode === 'wp' ? `Waypoint (Scenario ${activeScenario})` : (plotMode === 'poi' ? 'Point of Interest' : (plotMode === 'pin' ? 'Temporary Pin' : 'Port of Refuge Contingency'))}.`
+                     } <br/><span className="text-xs font-normal opacity-75">Je kunt bestaande markeringen op de kaart ook direct verslepen.</span>
                    </div>
                 )}
 
-                <div className={`relative w-full aspect-[2/1] min-h-[400px] rounded-lg border overflow-hidden bg-slate-800 ${plotMode !== 'off' ? 'map-plotting-mode ring-2 ring-current' : ''} ${isNightMode ? 'map-night-mode' : ''} ${theme.divider}`}>
-                   <div ref={mapRef} className="absolute inset-0 z-0"></div>
+                {/* Container voor de kaart. Als isMapExpanded waar is, krijgt de map een fixed class (volledig scherm) */}
+                <div className={isMapExpanded
+                    ? `fixed inset-2 md:inset-8 z-[9999] bg-slate-800 rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] border-4 ${isNightMode ? 'border-red-900 map-night-mode' : 'border-blue-500'}`
+                    : `relative w-full aspect-[2/1] min-h-[400px] rounded-lg border overflow-hidden bg-slate-800 ${plotMode !== 'off' ? 'map-plotting-mode ring-2 ring-current' : ''} ${isNightMode ? 'map-night-mode' : ''} ${theme.divider}`
+                }>
+                   <div ref={mapRef} className="absolute inset-0 z-0 rounded-lg"></div>
+
+                   {/* Nieuwe Knoppen linksboven in de interactieve kaart */}
+                   <div className="absolute top-[80px] left-[10px] z-[1000] flex flex-col gap-2">
+                       <button
+                          onClick={(e) => { e.stopPropagation(); setIsMapExpanded(!isMapExpanded); }}
+                          className={`w-8 h-8 flex items-center justify-center rounded shadow-md border transition-colors ${isNightMode ? 'bg-zinc-900 text-red-500 border-red-900 hover:bg-zinc-800' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'}`}
+                          title="Vergroot/Verklein Kaart"
+                       >
+                          <i className={`fa-solid ${isMapExpanded ? 'fa-compress' : 'fa-expand'}`}></i>
+                       </button>
+                       
+                       <button
+                          onClick={(e) => { e.stopPropagation(); togglePlotMode('info10'); }}
+                          className={`w-8 h-8 flex flex-col items-center justify-center rounded shadow-md border transition-colors ${plotMode === 'info10' ? (isNightMode ? 'bg-blue-900 text-white border-blue-700' : 'bg-blue-600 text-white border-blue-700') : (isNightMode ? 'bg-zinc-900 text-blue-400 border-blue-900 hover:bg-zinc-800' : 'bg-white text-blue-600 border-blue-300 hover:bg-blue-50')}`}
+                          title="Vraag nautische info op in 10m radius"
+                       >
+                          <i className="fa-solid fa-circle-info text-[10px] mb-0.5"></i>
+                          <span className="text-[8px] font-bold leading-none">10m</span>
+                       </button>
+
+                       <button
+                          onClick={(e) => { e.stopPropagation(); togglePlotMode('info100'); }}
+                          className={`w-8 h-8 flex flex-col items-center justify-center rounded shadow-md border transition-colors ${plotMode === 'info100' ? (isNightMode ? 'bg-blue-900 text-white border-blue-700' : 'bg-blue-600 text-white border-blue-700') : (isNightMode ? 'bg-zinc-900 text-blue-400 border-blue-900 hover:bg-zinc-800' : 'bg-white text-blue-600 border-blue-300 hover:bg-blue-50')}`}
+                          title="Vraag nautische info op in 100m radius"
+                       >
+                          <i className="fa-solid fa-circle-info text-[10px] mb-0.5"></i>
+                          <span className="text-[8px] font-bold leading-none">100m</span>
+                       </button>
+                   </div>
                 </div>
+
                 <div className={`text-right text-[10px] mt-2 opacity-60 font-mono ${theme.textMuted}`}>Overlays: OpenSeaMap (marks) {showDepth && '+ EMODnet (depth contours)'}</div>
                 
                 {tempPin && (
@@ -1219,7 +1259,6 @@
                 )}
               </section>
 
-              {/* Map Quick Zoom - Now underneath the Chart */}
               <CollapsibleSection title="Map Quick Zoom" icon={<i className="fa-solid fa-magnifying-glass text-lg"></i>} className={theme.card} defaultOpen={false}>
                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                     {activeWaypoints.length > 0 && (
@@ -1264,7 +1303,6 @@
                  </div>
               </CollapsibleSection>
 
-              {/* Points of Interest (POI) Database */}
               <CollapsibleSection title="Points of Interest Database" icon={<i className="fa-solid fa-circle-info text-lg"></i>} className={theme.card} defaultOpen={false}>
                   <div className="space-y-3">
                      {pois.length === 0 && <div className="text-sm italic opacity-50">No POIs logged.</div>}
@@ -1314,7 +1352,6 @@
                   </div>
               </CollapsibleSection>
 
-              {/* The Nav Table */}
               <CollapsibleSection 
                 title="Technical Nav-Table" 
                 icon={<i className="fa-solid fa-location-dot text-lg"></i>} 

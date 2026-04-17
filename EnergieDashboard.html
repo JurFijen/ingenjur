@@ -1,336 +1,465 @@
 
-import React, { useState, useEffect } from 'react';
-import { 
-  Sun, Cloud, CloudRain, Wind, 
-  Zap, TrendingUp, TrendingDown, 
-  AlertCircle, CheckCircle2, Clock, MapPin
-} from 'lucide-react';
-
-export default function App() {
-  const [weather, setWeather] = useState(null);
-  const [prices, setPrices] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        // 1. Haal weerdata op voor De Bilt (Lat: 52.1093, Lon: 5.1810) via Open-Meteo
-        const weatherRes = await fetch(
-          'https://api.open-meteo.com/v1/forecast?latitude=52.1093&longitude=5.1810&current_weather=true&hourly=cloudcover,windspeed_10m&timezone=Europe/Amsterdam'
-        );
-        const weatherData = await weatherRes.json();
-
-        // 2. Haal stroomprijzen op via de EnergyZero API (Publiek toegankelijk, gebruikt door veel dynamische contracten)
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-
-        const fromDate = today.toISOString();
-        const tillDate = tomorrow.toISOString();
-
-        let priceData = [];
-        try {
-          const priceRes = await fetch(
-            `https://api.energyzero.nl/v1/energyprices?fromDate=${fromDate}&tillDate=${tillDate}&interval=4&usageType=1&inclBtw=true`
-          );
-          const priceJson = await priceRes.json();
-          if (priceJson.Prices && priceJson.Prices.length > 0) {
-             priceData = priceJson.Prices;
-          } else {
-             throw new Error("Geen prijsdata");
-          }
-        } catch (err) {
-          // Fallback mock data voor het geval de API tijdelijk onbereikbaar is of geblokkeerd wordt door CORS
-          console.warn("EnergyZero API niet bereikbaar, fallback naar gesimuleerde data.", err);
-          priceData = generateMockPrices(today);
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Duurzaamheidsdashboard - De Bilt</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Custom styles voor de staafdiagram */
+        .chart-container {
+            display: flex;
+            align-items: flex-end;
+            height: 250px;
+            gap: 4px;
+            padding-top: 40px;
+        }
+        .bar-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            height: 100%;
+            justify-content: flex-end;
+        }
+        .bar {
+            width: 100%;
+            max-width: 24px;
+            border-top-left-radius: 6px;
+            border-top-right-radius: 6px;
+            transition: all 0.3s ease;
+            min-height: 20px;
+            cursor: pointer;
+            position: relative;
+        }
+        .bar:hover {
+            opacity: 1 !important;
+        }
+        .tooltip {
+            visibility: hidden;
+            opacity: 0;
+            position: absolute;
+            top: -35px;
+            background-color: #1e293b;
+            color: white;
+            font-size: 0.75rem;
+            padding: 4px 8px;
+            border-radius: 6px;
+            white-space: nowrap;
+            transition: opacity 0.2s;
+            z-index: 10;
+            font-weight: 500;
+        }
+        .bar-wrapper:hover .tooltip {
+            visibility: visible;
+            opacity: 1;
+        }
+        
+        /* Loading spinner */
+        .loader {
+            border: 4px solid #10b981;
+            border-top: 4px solid transparent;
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
-        setWeather(weatherData);
-        setPrices(priceData);
-      } catch (err) {
-        console.error(err);
-        setError('Kon de data niet laden. Probeer het later opnieuw.');
-      } finally {
-        setLoading(false);
-      }
-    };
+        /* Pulse animatie voor actueel uur */
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #1e293b;
+            border-radius: 50%;
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: translateX(-50%) scale(0.95); box-shadow: 0 0 0 0 rgba(30, 41, 59, 0.7); }
+            70% { transform: translateX(-50%) scale(1); box-shadow: 0 0 0 6px rgba(30, 41, 59, 0); }
+            100% { transform: translateX(-50%) scale(0.95); box-shadow: 0 0 0 0 rgba(30, 41, 59, 0); }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 font-sans text-slate-800 min-h-screen">
 
-    fetchData();
-    
-    // Ververs elke 15 minuten
-    const interval = setInterval(fetchData, 15 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Hulpfunctie om prijzen te simuleren (zodat de app altijd werkt)
-  const generateMockPrices = (baseDate) => {
-    return Array.from({ length: 24 }).map((_, i) => {
-      const date = new Date(baseDate);
-      date.setHours(i);
-      
-      // Simuleer een dal rond de middag (zon) en nacht, en een piek in de avond
-      let basePrice = 0.25; 
-      if (i >= 11 && i <= 15) basePrice -= 0.10; // Zonnepiek, lage prijs
-      if (i >= 17 && i <= 21) basePrice += 0.15; // Avondpiek, hoge prijs
-      if (i >= 0 && i <= 5) basePrice -= 0.05;   // Nacht, redelijk lage prijs
-      
-      // Voeg wat willekeurige ruis toe
-      const randomNoise = (Math.random() * 0.04) - 0.02;
-      
-      return {
-        readingDate: date.toISOString(),
-        price: Math.max(0, basePrice + randomNoise)
-      };
-    });
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 font-sans text-gray-800">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-emerald-700 font-medium">Dashboard wordt geladen...</p>
+    <!-- Loading State -->
+    <div id="loading-screen" class="fixed inset-0 bg-slate-50 flex items-center justify-center z-50">
+        <div class="flex flex-col items-center gap-4">
+            <div class="loader"></div>
+            <p class="text-emerald-700 font-medium">Dashboard wordt geladen...</p>
         </div>
-      </div>
-    );
-  }
+    </div>
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 font-sans">
-        <div className="bg-white p-6 rounded-2xl shadow-lg flex flex-col items-center text-center max-w-sm">
-          <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Oeps!</h2>
-          <p className="text-gray-600">{error}</p>
+    <!-- Error State -->
+    <div id="error-screen" class="hidden fixed inset-0 bg-slate-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-2xl shadow-lg flex flex-col items-center text-center max-w-sm">
+            <i data-lucide="alert-circle" class="w-12 h-12 text-red-500 mb-4"></i>
+            <h2 class="text-xl font-bold text-gray-800 mb-2">Oeps!</h2>
+            <p id="error-message" class="text-gray-600">Er ging iets mis.</p>
+            <button onclick="fetchData()" class="mt-4 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700">Opnieuw proberen</button>
         </div>
-      </div>
-    );
-  }
+    </div>
 
-  // --- Data Verwerking ---
-  const currentHour = new Date().getHours();
-  
-  // Weer
-  const currentTemp = weather?.current_weather?.temperature;
-  const currentWind = weather?.current_weather?.windspeed; // km/h
-  const weatherCode = weather?.current_weather?.weathercode;
-  
-  // Prijs
-  const currentPriceObj = prices?.find(p => new Date(p.readingDate).getHours() === currentHour);
-  const currentPrice = currentPriceObj ? currentPriceObj.price : 0;
-  
-  const allPrices = prices?.map(p => p.price) || [];
-  const avgPrice = allPrices.reduce((a, b) => a + b, 0) / (allPrices.length || 1);
-  const minPrice = Math.min(...allPrices);
-  const maxPrice = Math.max(...allPrices);
-  
-  // Bepaal Piek of Dal
-  // We definiëren 'Dal' als de prijs lager is dan het gemiddelde
-  const isDal = currentPrice < avgPrice;
-  const isExtremePiek = currentPrice > (avgPrice + 0.05);
-  const isExtremeDal = currentPrice <= minPrice + 0.02;
-
-  // Icoon bepalen op basis van WMO weather code
-  const getWeatherIcon = (code) => {
-    if (code === 0 || code === 1) return <Sun className="w-10 h-10 text-yellow-500" />;
-    if (code >= 2 && code <= 3) return <Cloud className="w-10 h-10 text-gray-400" />;
-    if (code >= 51 && code <= 99) return <CloudRain className="w-10 h-10 text-blue-500" />;
-    return <Sun className="w-10 h-10 text-yellow-500" />;
-  };
-
-  return (
-    <div className="min-h-screen bg-slate-100 p-4 sm:p-6 lg:p-8 font-sans text-slate-800">
-      <div className="max-w-5xl mx-auto space-y-6">
+    <!-- Main Dashboard -->
+    <div id="dashboard" class="hidden p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
         
-        {/* Header */}
-        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-              Duurzaamheidsdashboard
-            </h1>
-            <p className="text-slate-500 mt-1 flex items-center gap-1.5 font-medium">
-              <MapPin className="w-4 h-4 text-emerald-600" /> De Bilt, Nederland
-            </p>
-          </div>
-          <div className="flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-2xl border border-slate-100">
-            <Clock className="w-5 h-5 text-emerald-600" />
-            <span className="font-semibold text-slate-700">
-              {new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}
-            </span>
-          </div>
+        <!-- Header -->
+        <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60">
+            <div>
+                <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+                    Duurzaamheidsdashboard
+                </h1>
+                <p class="text-slate-500 mt-1 flex items-center gap-1.5 font-medium">
+                    <i data-lucide="map-pin" class="w-4 h-4 text-emerald-600"></i> De Bilt, Nederland
+                </p>
+            </div>
+            <div class="flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-2xl border border-slate-100">
+                <i data-lucide="clock" class="w-5 h-5 text-emerald-600"></i>
+                <span id="current-time" class="font-semibold text-slate-700">--:--</span>
+            </div>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          
-          {/* Weer Kaart */}
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 flex flex-col justify-between">
-            <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-              <Sun className="w-5 h-5 text-slate-400" /> Actueel Weer
-            </h2>
-            <div className="flex items-center justify-between mt-auto">
-              <div className="flex flex-col">
-                <span className="text-5xl font-black text-slate-900 tracking-tighter">
-                  {currentTemp}°<span className="text-2xl text-slate-400 font-bold">C</span>
-                </span>
-                <span className="text-slate-500 font-medium flex items-center gap-1.5 mt-2">
-                  <Wind className="w-4 h-4" /> {currentWind} km/u
-                </span>
-              </div>
-              <div className="bg-slate-50 p-4 rounded-full">
-                {getWeatherIcon(weatherCode)}
-              </div>
-            </div>
-          </div>
-
-          {/* Stroomprijs Kaart */}
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 flex flex-col justify-between md:col-span-2 relative overflow-hidden">
-            {/* Background gradient hint gebaseerd op status */}
-            <div className={`absolute top-0 right-0 w-32 h-32 rounded-bl-full opacity-10 transition-colors duration-500 ${isDal ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             
-            <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2 relative z-10">
-              <Zap className="w-5 h-5 text-slate-400" /> Actuele Stroomprijs
-            </h2>
-            
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 mt-auto relative z-10">
-              <div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-5xl font-black text-slate-900 tracking-tighter">
-                    €{currentPrice.toFixed(2)}
-                  </span>
-                  <span className="text-lg text-slate-500 font-semibold">/ kWh</span>
+            <!-- Weer Kaart -->
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 flex flex-col justify-between">
+                <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <i data-lucide="sun" class="w-5 h-5 text-slate-400"></i> Actueel Weer
+                </h2>
+                <div class="flex items-center justify-between mt-auto">
+                    <div class="flex flex-col">
+                        <span class="text-5xl font-black text-slate-900 tracking-tighter">
+                            <span id="weather-temp">--</span>°<span class="text-2xl text-slate-400 font-bold">C</span>
+                        </span>
+                        <span class="text-slate-500 font-medium flex items-center gap-1.5 mt-2">
+                            <i data-lucide="wind" class="w-4 h-4"></i> <span id="weather-wind">--</span> km/u
+                        </span>
+                    </div>
+                    <div class="bg-slate-50 p-4 rounded-full" id="weather-icon-container">
+                        <!-- Icon wordt hier via JS geplaatst -->
+                    </div>
                 </div>
-                <p className="text-sm text-slate-400 mt-2 font-medium">Inclusief belastingen</p>
-              </div>
-
-              <div className={`flex items-center gap-3 px-5 py-3 rounded-2xl border-2 ${
-                isDal 
-                  ? 'bg-emerald-50 border-emerald-100 text-emerald-700' 
-                  : 'bg-rose-50 border-rose-100 text-rose-700'
-              }`}>
-                {isDal ? <TrendingDown className="w-6 h-6" /> : <TrendingUp className="w-6 h-6" />}
-                <div>
-                  <span className="block font-bold text-lg leading-tight">
-                    {isDal ? 'Dal Moment' : 'Piek Moment'}
-                  </span>
-                  <span className="block text-sm opacity-80 font-medium">
-                    {isDal ? 'Goedkoper dan gemiddeld' : 'Duurder dan gemiddeld'}
-                  </span>
-                </div>
-              </div>
             </div>
-          </div>
+
+            <!-- Stroomprijs Kaart -->
+            <div id="price-card" class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 flex flex-col justify-between md:col-span-2 relative overflow-hidden transition-colors duration-500">
+                <!-- Achtergrond hint -->
+                <div id="price-bg-hint" class="absolute top-0 right-0 w-32 h-32 rounded-bl-full opacity-10 transition-colors duration-500"></div>
+                
+                <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2 relative z-10">
+                    <i data-lucide="zap" class="w-5 h-5 text-slate-400"></i> Actuele Stroomprijs
+                </h2>
+                
+                <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-6 mt-auto relative z-10">
+                    <div>
+                        <div class="flex items-baseline gap-1">
+                            <span class="text-5xl font-black text-slate-900 tracking-tighter" id="current-price">
+                                €--
+                            </span>
+                            <span class="text-lg text-slate-500 font-semibold">/ kWh</span>
+                        </div>
+                        <p class="text-sm text-slate-400 mt-2 font-medium">Inclusief belastingen</p>
+                    </div>
+
+                    <div id="price-status-badge" class="flex items-center gap-3 px-5 py-3 rounded-2xl border-2">
+                        <div id="price-status-icon"></div>
+                        <div>
+                            <span id="price-status-title" class="block font-bold text-lg leading-tight">--</span>
+                            <span id="price-status-desc" class="block text-sm opacity-80 font-medium">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* Advies Kaart */}
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 lg:col-span-1">
-            <h2 className="text-lg font-bold text-slate-800 mb-6">Advies voor nu</h2>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
-            <div className="flex flex-col gap-4 h-full">
-              {isExtremeDal ? (
-                <div className="bg-emerald-500 text-white p-5 rounded-2xl flex flex-col gap-3">
-                  <CheckCircle2 className="w-8 h-8" />
-                  <h3 className="font-bold text-xl">Perfect moment!</h3>
-                  <p className="text-emerald-50 text-sm leading-relaxed">
-                    De prijzen zijn nu extreem laag. Dit is hét moment om grootverbruikers zoals de wasmachine, droger of het opladen van een elektrische auto aan te zetten.
-                  </p>
+            <!-- Advies Kaart -->
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 lg:col-span-1">
+                <h2 class="text-lg font-bold text-slate-800 mb-6">Advies voor nu</h2>
+                <div id="advice-container" class="flex flex-col gap-4 h-full">
+                    <!-- Advies content wordt hier geïnjecteerd -->
                 </div>
-              ) : isDal ? (
-                <div className="bg-emerald-100 text-emerald-800 p-5 rounded-2xl flex flex-col gap-3">
-                  <CheckCircle2 className="w-8 h-8 text-emerald-600" />
-                  <h3 className="font-bold text-xl">Goed moment</h3>
-                  <p className="text-emerald-700 text-sm leading-relaxed">
-                    Stroom is momenteel voordelig. Prima tijd om de vaatwasser aan te zetten of andere huishoudelijke apparaten te gebruiken.
-                  </p>
-                </div>
-              ) : isExtremePiek ? (
-                <div className="bg-rose-500 text-white p-5 rounded-2xl flex flex-col gap-3">
-                  <AlertCircle className="w-8 h-8" />
-                  <h3 className="font-bold text-xl">Vermijd verbruik!</h3>
-                  <p className="text-rose-50 text-sm leading-relaxed">
-                    De stroom is nu erg duur. Wacht indien mogelijk met het aanzetten van zware apparaten tot de prijzen weer dalen (zie grafiek hiernaast).
-                  </p>
-                </div>
-              ) : (
-                <div className="bg-orange-50 text-orange-800 p-5 rounded-2xl flex flex-col gap-3 border border-orange-100">
-                  <AlertCircle className="w-8 h-8 text-orange-500" />
-                  <h3 className="font-bold text-xl">Let op verbruik</h3>
-                  <p className="text-orange-700 text-sm leading-relaxed">
-                    De prijs is momenteel hoger dan gemiddeld. Probeer grote stroomvreters even uit te stellen.
-                  </p>
-                </div>
-              )}
             </div>
-          </div>
 
-          {/* 24 Uurs Grafiek */}
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 lg:col-span-2 flex flex-col">
-            <h2 className="text-lg font-bold text-slate-800 mb-6 flex items-center justify-between">
-              <span>Prijsverloop Vandaag</span>
-              <span className="text-sm font-medium text-slate-500 bg-slate-100 px-3 py-1 rounded-full">Gem. €{avgPrice.toFixed(2)}</span>
-            </h2>
+            <!-- 24 Uurs Grafiek -->
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 lg:col-span-2 flex flex-col">
+                <h2 class="text-lg font-bold text-slate-800 mb-6 flex items-center justify-between">
+                    <span>Prijsverloop Vandaag</span>
+                    <span class="text-sm font-medium text-slate-500 bg-slate-100 px-3 py-1 rounded-full">Gem. €<span id="avg-price">--</span></span>
+                </h2>
+                
+                <div id="chart-container" class="chart-container">
+                    <!-- Balken worden hier via JS getekend -->
+                </div>
+                <div class="mt-4 text-center text-xs font-medium text-slate-400">
+                    Tijdstip (uur)
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // Start de Lucide icons
+        lucide.createIcons();
+
+        // Update de klok elke minuut
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('current-time').textContent = 
+                now.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+        }
+        updateClock();
+        setInterval(updateClock, 60000);
+
+        // Hulpfunctie om prijzen te simuleren (fallback)
+        const generateMockPrices = (baseDate) => {
+            return Array.from({ length: 24 }).map((_, i) => {
+                const date = new Date(baseDate);
+                date.setHours(i);
+                
+                let basePrice = 0.25; 
+                if (i >= 11 && i <= 15) basePrice -= 0.10; // Zonnepiek
+                if (i >= 17 && i <= 21) basePrice += 0.15; // Avondpiek
+                if (i >= 0 && i <= 5) basePrice -= 0.05;   // Nacht
+                
+                const randomNoise = (Math.random() * 0.04) - 0.02;
+                
+                return {
+                    readingDate: date.toISOString(),
+                    price: Math.max(0, basePrice + randomNoise)
+                };
+            });
+        };
+
+        // Bepaal het weer icoon
+        const getWeatherIconHTML = (code) => {
+            if (code === 0 || code === 1) return '<i data-lucide="sun" class="w-10 h-10 text-yellow-500"></i>';
+            if (code >= 2 && code <= 3) return '<i data-lucide="cloud" class="w-10 h-10 text-gray-400"></i>';
+            if (code >= 51 && code <= 99) return '<i data-lucide="cloud-rain" class="w-10 h-10 text-blue-500"></i>';
+            return '<i data-lucide="sun" class="w-10 h-10 text-yellow-500"></i>';
+        };
+
+        // Hoofdfunctie om data op te halen en de UI te updaten
+        async function fetchData() {
+            document.getElementById('loading-screen').classList.remove('hidden');
+            document.getElementById('error-screen').classList.add('hidden');
+            document.getElementById('dashboard').classList.add('hidden');
+
+            try {
+                // 1. Weerdata ophalen (De Bilt)
+                const weatherRes = await fetch(
+                    'https://api.open-meteo.com/v1/forecast?latitude=52.1093&longitude=5.1810&current_weather=true&timezone=Europe/Amsterdam'
+                );
+                const weatherData = await weatherRes.json();
+
+                // 2. Prijsdata ophalen (EnergyZero)
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const tomorrow = new Date(today);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+
+                const fromDate = today.toISOString();
+                const tillDate = tomorrow.toISOString();
+
+                let priceData = [];
+                try {
+                    const priceRes = await fetch(
+                        `https://api.energyzero.nl/v1/energyprices?fromDate=${fromDate}&tillDate=${tillDate}&interval=4&usageType=1&inclBtw=true`
+                    );
+                    const priceJson = await priceRes.json();
+                    if (priceJson.Prices && priceJson.Prices.length > 0) {
+                        priceData = priceJson.Prices;
+                    } else {
+                        throw new Error("Geen actuele prijsdata gevonden");
+                    }
+                } catch (err) {
+                    console.warn("API fout of CORS, fallback data wordt gebruikt.", err);
+                    priceData = generateMockPrices(today);
+                }
+
+                // Update UI met verzamelde data
+                updateUI(weatherData, priceData);
+
+                // Toon dashboard
+                document.getElementById('loading-screen').classList.add('hidden');
+                document.getElementById('dashboard').classList.remove('hidden');
+                
+                // Herlaad icons voor dynamisch toegevoegde content
+                lucide.createIcons();
+
+            } catch (error) {
+                console.error("Fout bij ophalen data:", error);
+                document.getElementById('loading-screen').classList.add('hidden');
+                document.getElementById('error-screen').classList.remove('hidden');
+                document.getElementById('error-message').textContent = 'Kon de data niet laden. Controleer je internetverbinding.';
+            }
+        }
+
+        function updateUI(weatherData, priceData) {
+            const currentHour = new Date().getHours();
+
+            // --- WEER ---
+            document.getElementById('weather-temp').textContent = weatherData.current_weather.temperature;
+            document.getElementById('weather-wind').textContent = weatherData.current_weather.windspeed;
+            document.getElementById('weather-icon-container').innerHTML = getWeatherIconHTML(weatherData.current_weather.weathercode);
+
+            // --- PRIJZEN ---
+            const currentPriceObj = priceData.find(p => new Date(p.readingDate).getHours() === currentHour) || priceData[0];
+            const currentPrice = currentPriceObj.price;
             
-            <div className="flex-1 min-h-[250px] flex items-end gap-1 sm:gap-2 pt-10">
-              {prices?.map((item, index) => {
+            const allPrices = priceData.map(p => p.price);
+            const avgPrice = allPrices.reduce((a, b) => a + b, 0) / allPrices.length;
+            const minPrice = Math.min(...allPrices);
+            const maxPrice = Math.max(...allPrices);
+
+            document.getElementById('current-price').textContent = `€${currentPrice.toFixed(2)}`;
+            document.getElementById('avg-price').textContent = avgPrice.toFixed(2);
+
+            // Bepaal status
+            const isDal = currentPrice < avgPrice;
+            const isExtremePiek = currentPrice > (avgPrice + 0.05);
+            const isExtremeDal = currentPrice <= minPrice + 0.02;
+
+            // Update Prijskaart styling
+            const bgHint = document.getElementById('price-bg-hint');
+            const statusBadge = document.getElementById('price-status-badge');
+            const statusIcon = document.getElementById('price-status-icon');
+            const statusTitle = document.getElementById('price-status-title');
+            const statusDesc = document.getElementById('price-status-desc');
+
+            if (isDal) {
+                bgHint.className = 'absolute top-0 right-0 w-32 h-32 rounded-bl-full opacity-10 transition-colors duration-500 bg-emerald-500';
+                statusBadge.className = 'flex items-center gap-3 px-5 py-3 rounded-2xl border-2 bg-emerald-50 border-emerald-100 text-emerald-700';
+                statusIcon.innerHTML = '<i data-lucide="trending-down" class="w-6 h-6"></i>';
+                statusTitle.textContent = 'Dal Moment';
+                statusDesc.textContent = 'Goedkoper dan gemiddeld';
+            } else {
+                bgHint.className = 'absolute top-0 right-0 w-32 h-32 rounded-bl-full opacity-10 transition-colors duration-500 bg-rose-500';
+                statusBadge.className = 'flex items-center gap-3 px-5 py-3 rounded-2xl border-2 bg-rose-50 border-rose-100 text-rose-700';
+                statusIcon.innerHTML = '<i data-lucide="trending-up" class="w-6 h-6"></i>';
+                statusTitle.textContent = 'Piek Moment';
+                statusDesc.textContent = 'Duurder dan gemiddeld';
+            }
+
+            // --- ADVIES ---
+            const adviceContainer = document.getElementById('advice-container');
+            if (isExtremeDal) {
+                adviceContainer.innerHTML = `
+                    <div class="bg-emerald-500 text-white p-5 rounded-2xl flex flex-col gap-3">
+                        <i data-lucide="check-circle-2" class="w-8 h-8"></i>
+                        <h3 class="font-bold text-xl">Perfect moment!</h3>
+                        <p class="text-emerald-50 text-sm leading-relaxed">
+                            De prijzen zijn nu extreem laag. Dit is hét moment om grootverbruikers zoals de wasmachine, droger of het opladen van een elektrische auto aan te zetten.
+                        </p>
+                    </div>`;
+            } else if (isDal) {
+                adviceContainer.innerHTML = `
+                    <div class="bg-emerald-100 text-emerald-800 p-5 rounded-2xl flex flex-col gap-3">
+                        <i data-lucide="check-circle-2" class="w-8 h-8 text-emerald-600"></i>
+                        <h3 class="font-bold text-xl">Goed moment</h3>
+                        <p class="text-emerald-700 text-sm leading-relaxed">
+                            Stroom is momenteel voordelig. Prima tijd om de vaatwasser aan te zetten of andere huishoudelijke apparaten te gebruiken.
+                        </p>
+                    </div>`;
+            } else if (isExtremePiek) {
+                adviceContainer.innerHTML = `
+                    <div class="bg-rose-500 text-white p-5 rounded-2xl flex flex-col gap-3">
+                        <i data-lucide="alert-circle" class="w-8 h-8"></i>
+                        <h3 class="font-bold text-xl">Vermijd verbruik!</h3>
+                        <p class="text-rose-50 text-sm leading-relaxed">
+                            De stroom is nu erg duur. Wacht indien mogelijk met het aanzetten van zware apparaten tot de prijzen weer dalen.
+                        </p>
+                    </div>`;
+            } else {
+                adviceContainer.innerHTML = `
+                    <div class="bg-orange-50 text-orange-800 p-5 rounded-2xl flex flex-col gap-3 border border-orange-100">
+                        <i data-lucide="alert-circle" class="w-8 h-8 text-orange-500"></i>
+                        <h3 class="font-bold text-xl">Let op verbruik</h3>
+                        <p class="text-orange-700 text-sm leading-relaxed">
+                            De prijs is momenteel hoger dan gemiddeld. Probeer grote stroomvreters even uit te stellen.
+                        </p>
+                    </div>`;
+            }
+
+            // --- GRAFIEK (Staafdiagram) ---
+            const chartContainer = document.getElementById('chart-container');
+            chartContainer.innerHTML = ''; // Leegmaken
+
+            const priceRange = maxPrice - minPrice;
+
+            priceData.forEach((item) => {
                 const itemHour = new Date(item.readingDate).getHours();
                 const isCurrent = itemHour === currentHour;
                 
-                // Bereken hoogte percentage voor de staafdiagram (met wat marge voor de min prijs)
-                const priceRange = maxPrice - minPrice;
+                // Bereken hoogte percentage
                 const normalizedHeight = priceRange === 0 
-                  ? 50 
-                  : ((item.price - minPrice) / priceRange) * 100;
+                    ? 50 
+                    : ((item.price - minPrice) / priceRange) * 100;
                 
-                // Zorg voor een minimale hoogte zodat balkjes altijd zichtbaar zijn
-                const finalHeight = Math.max(10, normalizedHeight);
+                const finalHeight = Math.max(10, normalizedHeight); // Minimaal 10%
                 
-                // Kleur logica
-                let barColor = 'bg-slate-200';
-                if (item.price < avgPrice - 0.02) barColor = 'bg-emerald-400';
-                else if (item.price > avgPrice + 0.02) barColor = 'bg-rose-400';
-                else barColor = 'bg-orange-300';
+                // Bepaal kleur
+                let bgColorClass = 'bg-slate-200';
+                if (item.price < avgPrice - 0.02) bgColorClass = 'bg-emerald-400';
+                else if (item.price > avgPrice + 0.02) bgColorClass = 'bg-rose-400';
+                else bgColorClass = 'bg-orange-300';
                 
-                if (isCurrent) barColor = 'bg-slate-800';
+                if (isCurrent) bgColorClass = 'bg-slate-800';
 
-                return (
-                  <div key={index} className="flex-1 flex flex-col items-center group relative">
-                    
-                    {/* Tooltip op hover */}
-                    <div className="opacity-0 group-hover:opacity-100 absolute -top-12 bg-slate-800 text-white text-xs py-1 px-2 rounded-lg pointer-events-none transition-opacity whitespace-nowrap z-10 font-medium">
-                      €{item.price.toFixed(3)}
-                    </div>
-                    
-                    {/* Staafje */}
-                    <div className="w-full relative flex justify-center">
-                      <div 
-                        className={`w-full max-w-[24px] rounded-t-md transition-all duration-300 ${barColor} ${isCurrent ? 'shadow-lg' : 'opacity-80 hover:opacity-100'}`}
-                        style={{ height: `${finalHeight}%`, minHeight: '20px' }}
-                      >
-                        {isCurrent && (
-                          <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-800 rounded-full animate-pulse"></div>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {/* Uur label */}
-                    <div className={`mt-3 text-xs font-semibold ${isCurrent ? 'text-slate-900' : 'text-slate-400'}`}>
-                      {itemHour.toString().padStart(2, '0')}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="mt-4 text-center text-xs font-medium text-slate-400">
-              Tijdstip (uur)
-            </div>
-          </div>
+                // HTML opbouwen
+                const wrapper = document.createElement('div');
+                wrapper.className = 'bar-wrapper';
 
-        </div>
-      </div>
-    </div>
-  );
-}
+                const tooltip = document.createElement('div');
+                tooltip.className = 'tooltip';
+                tooltip.textContent = `€${item.price.toFixed(3)}`;
+
+                const barContainer = document.createElement('div');
+                barContainer.className = 'w-full flex justify-center h-full items-end';
+
+                const bar = document.createElement('div');
+                bar.className = `bar ${bgColorClass} ${isCurrent ? 'shadow-lg opacity-100' : 'opacity-80'}`;
+                bar.style.height = `${finalHeight}%`;
+
+                if (isCurrent) {
+                    const dot = document.createElement('div');
+                    dot.className = 'pulse-dot';
+                    bar.appendChild(dot);
+                }
+
+                const label = document.createElement('div');
+                label.className = `mt-3 text-xs font-semibold ${isCurrent ? 'text-slate-900' : 'text-slate-400'}`;
+                label.textContent = itemHour.toString().padStart(2, '0');
+
+                barContainer.appendChild(bar);
+                wrapper.appendChild(tooltip);
+                wrapper.appendChild(barContainer);
+                wrapper.appendChild(label);
+                
+                chartContainer.appendChild(wrapper);
+            });
+        }
+
+        // Start het ophalen
+        fetchData();
+        
+        // Ververs data elke 15 minuten
+        setInterval(fetchData, 15 * 60 * 1000);
+
+    </script>
+</body>
+</html>
+

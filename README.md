@@ -9,4 +9,4 @@
 * [StravaOwn](https://jurfijen.github.io/ingenjur/StravaOwn.html)
 
 * [Test](https://jurfijen.github.io/ingenjur/test.html)
-* [duurzaam dashboard](https://jurfijen.github.io/ingenjur/energiedashboard.html)
+* [duurzaam dashboard](https://jurfijen.github.io/ingenjur/EnergieDashboard.html)

@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kilometerregistratie App</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        /* Custom scrollbar for database table */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9; 
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-800 font-sans">
+
+    <!-- Header -->
+    <header class="bg-blue-900 text-white p-6 shadow-md">
+        <div class="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 class="text-2xl font-bold flex items-center gap-2">
+                    <i data-lucide="car" class="w-6 h-6"></i> Kilometerregistratie
+                </h1>
+                <p class="text-blue-200 text-sm mt-1">Snel, accuraat en direct naar CSV (HTML Versie)</p>
+            </div>
+            
+            <div class="flex gap-2 bg-blue-800 p-1 rounded-lg">
+                <button onclick="switchTab('instellingen')" id="nav-instellingen" class="px-4 py-2 rounded-md flex items-center gap-2 transition-colors bg-blue-600 font-medium">
+                    <i data-lucide="settings" class="w-4 h-4"></i> Start
+                </button>
+                <button onclick="switchTab('invullen')" id="nav-invullen" class="px-4 py-2 rounded-md flex items-center gap-2 transition-colors hover:bg-blue-700">
+                    <i data-lucide="calendar-days" class="w-4 h-4"></i> Dagen
+                </button>
+                <button onclick="switchTab('kaart')" id="nav-kaart" class="px-4 py-2 rounded-md flex items-center gap-2 transition-colors hover:bg-blue-700">
+                    <i data-lucide="map-pin" class="w-4 h-4"></i> Locaties
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-6xl mx-auto p-6">
+        
+        <!-- TAB 1: Instellingen -->
+        <div id="tab-instellingen" class="block">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-2xl mx-auto">
+                <h2 class="text-xl font-semibold mb-6 border-b pb-2">Nieuwe Maand Starten</h2>
+                
+                <div class="grid grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-600 mb-2">Maand</label>
+                        <select id="input-month" class="w-full p-2 border border-slate-300 rounded-md bg-slate-50 focus:ring-blue-500 focus:border-blue-500">
+                            <!-- Options generated via JS -->
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-600 mb-2">Jaar</label>
+                        <input type="number" id="input-year" class="w-full p-2 border border-slate-300 rounded-md bg-slate-50 focus:ring-blue-500 focus:border-blue-500" />
+                    </div>
+                </div>
+
+                <div class="mb-8">
+                    <label class="block text-sm font-medium text-slate-600 mb-2">Beginstand Kilometerteller (Auto)</label>
+                    <input type="number" id="input-beginstand" class="w-full p-2 border border-slate-300 rounded-md bg-slate-50 focus:ring-blue-500 focus:border-blue-500 text-lg font-mono" />
+                </div>
+
+                <button onclick="generateDays()" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2">
+                    <i data-lucide="calendar-days" class="w-5 h-5"></i> Werkdagen Genereren
+                </button>
+                <p class="text-xs text-slate-400 text-center mt-3">Dit genereert alle maandag t/m vrijdag dagen voor de geselecteerde maand.</p>
+            </div>
+        </div>
+
+        <!-- TAB 2: Dagen Invullen -->
+        <div id="tab-invullen" class="hidden">
+            <div class="flex justify-between items-center mb-6 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                <h2 id="days-header-title" class="text-lg font-semibold text-slate-700">Geen dagen gegenereerd</h2>
+                <button id="btn-export" onclick="exportCSV()" class="hidden bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg shadow-sm flex items-center gap-2 font-medium transition-colors">
+                    <i data-lucide="download" class="w-4 h-4"></i> Exporteer naar CSV
+                </button>
+            </div>
+
+            <div id="days-container" class="space-y-4">
+                <!-- Dagen worden hier via JS geïnjecteerd -->
+            </div>
+        </div>
+
+        <!-- TAB 3: Locaties & Kaart -->
+        <div id="tab-kaart" class="hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Linker Kant: Toevoegen en Kaart -->
+                <div class="space-y-6">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                        <h2 class="text-lg font-semibold mb-4">Prik een locatie op de kaart</h2>
+                        <p class="text-sm text-slate-500 mb-4">Klik ergens op de kaart en de app zoekt automatisch de postcode en straat erbij.</p>
+                        <div id="map-container" class="h-64 bg-slate-100 rounded-lg border border-slate-300 z-0 relative"></div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                        <h2 class="text-lg font-semibold mb-4">Geselecteerde Locatie Opslaan</h2>
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs text-slate-500 mb-1">Naam / Project</label>
+                                    <input type="text" id="newLoc-name" class="w-full p-2 text-sm border border-slate-300 rounded-md" placeholder="Bijv. Project X" />
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-slate-500 mb-1">Postcode</label>
+                                    <input type="text" id="newLoc-zip" class="w-full p-2 text-sm border border-slate-300 rounded-md" placeholder="1234 AB" />
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs text-slate-500 mb-1">Huisnummer</label>
+                                    <input type="text" id="newLoc-number" class="w-full p-2 text-sm border border-slate-300 rounded-md" placeholder="10" />
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-slate-500 mb-1">Standaard Route</label>
+                                    <input type="text" id="newLoc-defaultRoute" class="w-full p-2 text-sm border border-slate-300 rounded-md" placeholder="A1 / A27" />
+                                </div>
+                            </div>
+                            <button onclick="handleAddLocation()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-md shadow-sm transition-colors flex justify-center items-center gap-2">
+                                <i data-lucide="plus" class="w-4 h-4"></i> Toevoegen aan Database
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rechter Kant: Database Overzicht -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                    <div class="p-4 border-b bg-slate-50">
+                        <h2 class="text-lg font-semibold">Jouw Locatie Database</h2>
+                    </div>
+                    <div class="overflow-y-auto p-0 flex-1 h-[600px] custom-scrollbar">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-white border-b sticky top-0 z-10 shadow-sm">
+                                    <th class="p-3 text-xs font-semibold text-slate-500 uppercase">Naam</th>
+                                    <th class="p-3 text-xs font-semibold text-slate-500 uppercase">Adres</th>
+                                    <th class="p-3 text-xs font-semibold text-slate-500 uppercase">Route</th>
+                                    <th class="p-3 text-xs font-semibold text-slate-500 uppercase"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="locations-tbody" class="divide-y divide-slate-100">
+                                <!-- Locations worden hier via JS geïnjecteerd -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // --- INITIAL STATE ---
+        const initialLocations = [
+            { id: '1', name: 'Huisadres', zip: '3731 LG', number: '28', defaultRoute: '' },
+            { id: '2', name: 'Kantoor Breda', zip: '4837 DS', number: '75', defaultRoute: 'A27' },
+            { id: '3', name: 'Sweco Ams', zip: '1033 SE', number: '48', defaultRoute: 'A1' },
+            { id: '4', name: 'Sweco Eindhoven', zip: '5617 AM', number: '73', defaultRoute: 'A2' },
+            { id: '5', name: 'Sweco Rotterdam', zip: '3011 XR', number: '5', defaultRoute: 'A20' },
+            { id: '6', name: 'Sweco Arnhem', zip: '6824 BJ', number: '26', defaultRoute: 'A12' },
+            { id: '7', name: 'Spie Hengelo', zip: '7556 PE', number: '20', defaultRoute: 'A1' },
+            { id: '8', name: 'Spie Breda', zip: '4815 PN', number: '15', defaultRoute: 'A27' },
+            { id: '9', name: 'HvA Amsterdam', zip: '1091 GC', number: '2', defaultRoute: 'A1' },
+            { id: '10', name: 'Dura Vermeer DB', zip: '5216 PC', number: '1', defaultRoute: 'A2' },
+            { id: '11', name: 'Heijmans Rosmalen', zip: '5248 JT', number: '65', defaultRoute: 'A2' },
+            { id: '12', name: 'MBT 380', zip: '6051 MZ', number: '11', defaultRoute: 'A2' }
+        ];
+
+        let state = {
+            activeTab: 'instellingen',
+            year: new Date().getFullYear(),
+            month: new Date().getMonth() + 1,
+            beginstand: 33451,
+            locations: [...initialLocations],
+            days: [],
+            distanceMemory: {
+                "1-2": 75, "2-1": 75,
+                "1-12": 150, "12-1": 150,
+                "1-11": 65, "11-1": 65
+            }
+        };
+
+        let map = null;
+        let mapMarker = null;
+
+        // --- INIT ---
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            initSettingsForm();
+            renderLocationsTable();
+        });
+
+        // --- TAB NAVIGATION ---
+        function switchTab(tabName) {
+            state.activeTab = tabName;
+            
+            // Verberg alles
+            document.getElementById('tab-instellingen').classList.add('hidden');
+            document.getElementById('tab-invullen').classList.add('hidden');
+            document.getElementById('tab-kaart').classList.add('hidden');
+            
+            // Reset navigatie styling
+            ['instellingen', 'invullen', 'kaart'].forEach(t => {
+                const btn = document.getElementById(`nav-${t}`);
+                btn.classList.remove('bg-blue-600', 'font-medium');
+                btn.classList.add('hover:bg-blue-700');
+            });
+
+            // Toon actieve tab
+            document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`nav-${tabName}`);
+            activeBtn.classList.add('bg-blue-600', 'font-medium');
+            activeBtn.classList.remove('hover:bg-blue-700');
+
+            if (tabName === 'kaart') {
+                initMap();
+            } else if (tabName === 'invullen') {
+                renderDays();
+            }
+        }
+
+        // --- SETTINGS FORM ---
+        function initSettingsForm() {
+            const monthSelect = document.getElementById('input-month');
+            const months = ['Januari', 'Februari', 'Maart', 'April', 'Mei', 'Juni', 'Juli', 'Augustus', 'September', 'Oktober', 'November', 'December'];
+            months.forEach((m, i) => {
+                const option = document.createElement('option');
+                option.value = i + 1;
+                option.text = m;
+                if (i + 1 === state.month) option.selected = true;
+                monthSelect.appendChild(option);
+            });
+
+            document.getElementById('input-year').value = state.year;
+            document.getElementById('input-beginstand').value = state.beginstand;
+
+            // Update state on input change
+            monthSelect.addEventListener('change', (e) => state.month = Number(e.target.value));
+            document.getElementById('input-year').addEventListener('change', (e) => state.year = Number(e.target.value));
+            document.getElementById('input-beginstand').addEventListener('change', (e) => state.beginstand = Number(e.target.value));
+        }
+
+        // --- GENERATE DAYS ---
+        function generateDays() {
+            const newDays = [];
+            const daysInMonth = new Date(state.year, state.month, 0).getDate();
+            
+            for(let i=1; i<=daysInMonth; i++) {
+                const d = new Date(state.year, state.month - 1, i);
+                const dayOfWeek = d.getDay();
+                
+                // Alleen Maandag (1) t/m Vrijdag (5)
+                if(dayOfWeek !== 0 && dayOfWeek !== 6) { 
+                    const defaultKm = state.distanceMemory["1-2"] || 0;
+                    newDays.push({
+                        id: `day-${i}`,
+                        date: d,
+                        vervoer: 'Auto',
+                        heen: { van: '1', naar: '2', route: 'A27', km: defaultKm },
+                        terug: { van: '2', naar: '1', route: 'A27', km: defaultKm }
+                    });
+                }
+            }
+            state.days = newDays;
+            
+            // Update Headers
+            const monthName = new Date(state.year, state.month - 1).toLocaleString('nl-NL', { month: 'long', year: 'numeric' });
+            document.getElementById('days-header-title').innerText = `Ritten voor ${monthName}`;
+            document.getElementById('btn-export').classList.remove('hidden');
+
+            switchTab('invullen');
+        }
+
+        // --- RENDER DAYS (TAB 2) ---
+        function renderDays() {
+            const container = document.getElementById('days-container');
+            
+            if (state.days.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-20 bg-slate-100 rounded-xl border border-dashed border-slate-300">
+                        <p class="text-slate-500 mb-4">Je hebt nog geen dagen gegenereerd voor deze sessie.</p>
+                        <button onclick="switchTab('instellingen')" class="text-blue-600 underline">Ga naar Instellingen</button>
+                    </div>`;
+                return;
+            }
+
+            let html = '';
+            
+            // Helper function to generate options
+            const getLocOptions = (selectedId) => {
+                return state.locations.map(l => `<option value="${l.id}" ${l.id === selectedId ? 'selected' : ''}>${l.name}</option>`).join('');
+            };
+
+            const getVervoerBtn = (day, mode, iconName) => {
+                const isActive = day.vervoer === mode;
+                const activeClass = isActive ? 'bg-blue-600 text-white font-medium' : 'bg-white border text-slate-600 hover:bg-slate-50';
+                return `<button onclick="handleDayChange('${day.id}', 'algemeen', 'vervoer', '${mode}')" class="px-3 py-1 text-sm rounded-full flex items-center gap-1 transition-colors ${activeClass}">
+                            <i data-lucide="${iconName}" class="w-3 h-3"></i> ${mode}
+                        </button>`;
+            };
+
+            state.days.forEach(day => {
+                const dateStr = day.date.toLocaleDateString('nl-NL', { weekday: 'short', day: '2-digit', month: '2-digit' });
+                
+                let bodyHtml = '';
+                if (day.vervoer !== 'Vrij') {
+                    bodyHtml = `
+                        <div class="p-4 grid grid-cols-1 lg:grid-cols-2 gap-8 divide-y lg:divide-y-0 lg:divide-x divide-slate-100">
+                            <!-- Heenreis -->
+                            <div class="space-y-4 lg:pr-8">
+                                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Heenreis (Rit 1)</h4>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-xs text-slate-500 mb-1">Vertrek</label>
+                                        <select onchange="handleDayChange('${day.id}', 'heen', 'van', this.value)" class="w-full p-2 text-sm border border-slate-300 rounded-md">
+                                            ${getLocOptions(day.heen.van)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-slate-500 mb-1">Aankomst</label>
+                                        <select onchange="handleDayChange('${day.id}', 'heen', 'naar', this.value)" class="w-full p-2 text-sm border border-slate-300 rounded-md">
+                                            ${getLocOptions(day.heen.naar)}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-xs text-slate-500 mb-1">Route (bijv. A27)</label>
+                                        <input type="text" value="${day.heen.route}" onchange="handleDayChange('${day.id}', 'heen', 'route', this.value)" class="w-full p-2 text-sm border border-slate-300 rounded-md" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-slate-500 mb-1">Afstand (km)</label>
+                                        <input type="number" value="${day.heen.km}" onchange="handleDayChange('${day.id}', 'heen', 'km', this.value)" class="w-full p-2 text-sm border border-slate-300 rounded-md bg-yellow-50" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Terugreis -->
+                            <div class="space-y-4 lg:pl-8 pt-4 lg:pt-0">
+                                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Terugreis (Rit 2)</h4>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-xs text-slate-500 mb-1">Vertrek</label>
+                                        <select onchange="handleDayChange('${day.id}', 'terug', 'van', this.value)" class="w-full p-2 text-sm border border-slate-300 rounded-md">
+                                            ${getLocOptions(day.terug.van)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-slate-500 mb-1">Aankomst</label>
+                                        <select onchange="handleDayChange('${day.id}', 'terug', 'naar', this.value)" class="w-full p-2 text-sm border border-slate-300 rounded-md">
+                                            ${getLocOptions(day.terug.naar)}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-xs text-slate-500 mb-1">Route (bijv. A27)</label>
+                                        <input type="text" value="${day.terug.route}" onchange="handleDayChange('${day.id}', 'terug', 'route', this.value)" class="w-full p-2 text-sm border border-slate-300 rounded-md" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-slate-500 mb-1">Afstand (km)</label>
+                                        <input type="number" value="${day.terug.km}" onchange="handleDayChange('${day.id}', 'terug', 'km', this.value)" class="w-full p-2 text-sm border border-slate-300 rounded-md bg-yellow-50" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                html += `
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="bg-slate-100 px-4 py-3 border-b flex justify-between items-center">
+                            <div class="font-medium text-slate-700 w-40">${dateStr}</div>
+                            <div class="flex gap-2">
+                                ${getVervoerBtn(day, 'Auto', 'car')}
+                                ${getVervoerBtn(day, 'Fiets', 'bike')}
+                                ${getVervoerBtn(day, 'OV', 'train')}
+                                ${getVervoerBtn(day, 'Vrij', 'coffee')}
+                            </div>
+                        </div>
+                        ${bodyHtml}
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+            lucide.createIcons(); // Render icoontjes in de gegenereerde HTML
+        }
+
+        // --- HANDLE DAY CHANGES ---
+        window.handleDayChange = function(dayId, tripType, field, value) {
+            const dayIndex = state.days.findIndex(d => d.id === dayId);
+            if(dayIndex === -1) return;
+            
+            let day = state.days[dayIndex];
+
+            if (tripType === 'algemeen') {
+                day[field] = value;
+            } else {
+                day[tripType][field] = value;
+                
+                // Auto-fill logic
+                if (field === 'naar') {
+                    const targetLoc = state.locations.find(l => l.id === value);
+                    if (targetLoc) day[tripType].route = targetLoc.defaultRoute || '';
+                    
+                    const memoryKey = `${day[tripType].van}-${value}`;
+                    if (state.distanceMemory[memoryKey] !== undefined) {
+                        day[tripType].km = state.distanceMemory[memoryKey];
+                    } else {
+                        day[tripType].km = 0;
+                    }
+                }
+                
+                if (field === 'van') {
+                    const memoryKey = `${value}-${day[tripType].naar}`;
+                    if (state.distanceMemory[memoryKey] !== undefined) {
+                        day[tripType].km = state.distanceMemory[memoryKey];
+                    }
+                }
+                
+                // Save to memory if manually typing KM
+                if (field === 'km') {
+                    const memoryKey = `${day[tripType].van}-${day[tripType].naar}`;
+                    state.distanceMemory[memoryKey] = Number(value);
+                }
+            }
+            
+            // Re-render om de veranderingen (en auto-fills) te tonen
+            renderDays();
+        };
+
+        // --- MAP & LOCATIONS LOGIC ---
+        function initMap() {
+            if (map !== null) {
+                map.invalidateSize(); // Fix gray map issue when container was hidden
+                return;
+            }
+
+            map = L.map('map-container').setView([52.0907, 5.1214], 7);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+
+            map.on('click', async (e) => {
+                const { lat, lng } = e.latlng;
+                
+                if (mapMarker) map.removeLayer(mapMarker);
+                mapMarker = L.marker([lat, lng]).addTo(map);
+
+                try {
+                    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+                    const data = await res.json();
+                    if (data && data.address) {
+                        document.getElementById('newLoc-name').value = data.address.road || data.address.city || 'Nieuwe Locatie';
+                        document.getElementById('newLoc-zip').value = data.address.postcode || '';
+                        document.getElementById('newLoc-number').value = data.address.house_number || '';
+                    }
+                } catch (err) {
+                    console.error("Geocoding failed", err);
+                }
+            });
+        }
+
+        function handleAddLocation() {
+            const name = document.getElementById('newLoc-name').value;
+            const zip = document.getElementById('newLoc-zip').value;
+            const number = document.getElementById('newLoc-number').value;
+            const route = document.getElementById('newLoc-defaultRoute').value;
+
+            if(!name || !zip) {
+                alert("Vul minimaal een naam en postcode in.");
+                return;
+            }
+
+            const newLoc = { id: Date.now().toString(), name, zip, number, defaultRoute: route };
+            state.locations.push(newLoc);
+            
+            // Reset form
+            document.getElementById('newLoc-name').value = '';
+            document.getElementById('newLoc-zip').value = '';
+            document.getElementById('newLoc-number').value = '';
+            document.getElementById('newLoc-defaultRoute').value = '';
+            if (mapMarker) map.removeLayer(mapMarker);
+
+            renderLocationsTable();
+        }
+
+        window.handleDeleteLocation = function(id) {
+            state.locations = state.locations.filter(l => l.id !== id);
+            renderLocationsTable();
+        };
+
+        function renderLocationsTable() {
+            const tbody = document.getElementById('locations-tbody');
+            tbody.innerHTML = '';
+
+            state.locations.forEach(loc => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition-colors";
+                tr.innerHTML = `
+                    <td class="p-3 text-sm font-medium">${loc.name}</td>
+                    <td class="p-3 text-sm text-slate-600">${loc.zip}${loc.number ? `, ${loc.number}` : ''}</td>
+                    <td class="p-3 text-sm text-slate-600"><span class="bg-slate-100 px-2 py-1 rounded text-xs border">${loc.defaultRoute || '-'}</span></td>
+                    <td class="p-3 text-right">
+                        <button onclick="handleDeleteLocation('${loc.id}')" class="text-red-400 hover:text-red-600 p-1">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        // --- EXPORT CSV ---
+        // Helper functies voor datum/week
+        const getWeekNumber = (d) => {
+            const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+            const dayNum = date.getUTCDay() || 7;
+            date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+            const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+            return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+        };
+        const getEnglishDayName = (date) => ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][date.getDay()];
+        const formatDateStr = (date) => {
+            const pad = (n) => n.toString().padStart(2, '0');
+            return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
+        };
+
+        function exportCSV() {
+            let csvContent = "Jaar,Maand,Week,Dag,Ritnummer,Datum,Beginstand,Km,Eindstand,Ritsoort,Van,\"Van Postocode + \nhuisnr.\",Naar,\"Naar Postocode + \nhuisnr.\",Route,Totaal\r\n";
+            let currentOdo = parseInt(state.beginstand, 10) || 0;
+            let runningTotal = 0;
+            let ritNummer = 1;
+
+            state.days.forEach(day => {
+                if (day.vervoer === 'Vrij') return;
+
+                const dateStr = formatDateStr(day.date);
+                const yyyy = day.date.getFullYear();
+                const mm = day.date.getMonth() + 1;
+                const week = getWeekNumber(day.date);
+                const dayName = getEnglishDayName(day.date);
+
+                const getLocStr = (locId) => {
+                    const loc = state.locations.find(l => l.id === locId);
+                    if(!loc) return ["", ""];
+                    return [loc.name, `"${loc.zip}, ${loc.number}"`];
+                }
+
+                const processTrip = (trip) => {
+                    if (!trip.km || trip.km <= 0) return;
+
+                    const [vanNaam, vanAdres] = getLocStr(trip.van);
+                    const [naarNaam, naarAdres] = getLocStr(trip.naar);
+                    
+                    const isWoonWerk = (vanNaam === 'Huisadres' && naarNaam === 'Kantoor Breda') || 
+                                       (vanNaam === 'Kantoor Breda' && naarNaam === 'Huisadres');
+                    const ritSoort = isWoonWerk ? 'Woon/Werk' : 'Zakelijk';
+
+                    let odoStart = '';
+                    let odoEnd = '';
+                    if (day.vervoer === 'Auto') {
+                        odoStart = currentOdo;
+                        odoEnd = currentOdo + parseInt(trip.km);
+                        currentOdo += parseInt(trip.km);
+                        runningTotal += parseInt(trip.km);
+                    }
+
+                    csvContent += `${yyyy},${mm},${week},${dayName},${ritNummer},${dateStr},${odoStart},${trip.km},${odoEnd},${ritSoort},${vanNaam},${vanAdres},${naarNaam},${naarAdres},${trip.route},${runningTotal}\r\n`;
+                    ritNummer++;
+                };
+
+                processTrip(day.heen);
+                processTrip(day.terug);
+            });
+
+            // Download bestand logica
+            const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", `Kilometerregistratie_${state.year}_${state.month}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>

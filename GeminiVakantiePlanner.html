@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Strategische Bestemmingsanalyse: Zuid-Frankrijk</title>
+    
+    <!-- Tailwind CSS voor styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet CSS voor de interactieve kaart -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- FontAwesome voor iconen -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+            z-index: 1;
+            cursor: default;
+        }
+        
+        #map.picking-location {
+            cursor: crosshair !important;
+        }
+
+        /* Custom Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* Marker styling */
+        .custom-marker {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            color: white;
+            font-size: 14px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border: 2px solid white;
+        }
+
+        .marker-alpen { background-color: #3b82f6; } /* Blauw */
+        .marker-auvergne { background-color: #ef4444; } /* Rood */
+        .marker-pyreneeen { background-color: #10b981; } /* Groen */
+        .marker-occitanie { background-color: #f59e0b; } /* Oranje */
+        .marker-corsica { background-color: #8b5cf6; } /* Paars */
+        .marker-overig { background-color: #64748b; } /* Grijs */
+
+        /* Filter Chip Styling */
+        .filter-chip {
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+            user-select: none;
+        }
+        .filter-chip.active {
+            background-color: #2563eb;
+            color: white;
+            border-color: #2563eb;
+        }
+        .filter-chip:hover:not(.active) {
+            background-color: #e2e8f0;
+        }
+    </style>
+</head>
+<body class="h-screen overflow-hidden flex flex-col md:flex-row">
+
+    <!-- 1. Linker Sidebar / Controlepaneel (Filters) -->
+    <aside class="w-full md:w-1/4 h-[33vh] md:h-screen bg-white shadow-2xl flex flex-col z-10 relative border-r border-gray-200">
+        <div class="p-5 border-b border-gray-200 bg-slate-50">
+            <h1 class="text-xl font-bold text-gray-800 mb-1">Zuid-Frankrijk Verkenner</h1>
+            <p class="text-xs text-gray-600">Filter locaties en plan je vakantie.</p>
+        </div>
+
+        <div class="flex-1 overflow-y-auto custom-scrollbar p-5">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-md font-semibold text-gray-800">Categorieën</h2>
+                <button id="reset-filters" class="text-xs text-blue-600 hover:text-blue-800 underline">Reset</button>
+            </div>
+            
+            <div id="filters-container" class="space-y-5">
+                <!-- Filters dynamisch -->
+            </div>
+        </div>
+    </aside>
+
+    <!-- 2. Midden: Kaart Container -->
+    <main class="w-full md:flex-1 h-[34vh] md:h-screen relative">
+        <div id="map"></div>
+        
+        <!-- Legenda -->
+        <div class="absolute bottom-6 right-6 bg-white p-3 rounded-lg shadow-lg z-[1000] border border-gray-200 pointer-events-auto">
+            <h4 class="font-semibold text-xs mb-2 text-gray-800">Regio's</h4>
+            <div class="grid grid-cols-2 gap-x-4 gap-y-1">
+                <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full marker-alpen"></div><span class="text-[10px] text-gray-700">Alpen</span></div>
+                <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full marker-auvergne"></div><span class="text-[10px] text-gray-700">Auvergne</span></div>
+                <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full marker-pyreneeen"></div><span class="text-[10px] text-gray-700">Pyreneeën</span></div>
+                <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full marker-occitanie"></div><span class="text-[10px] text-gray-700">Occitanië</span></div>
+                <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full marker-corsica"></div><span class="text-[10px] text-gray-700">Corsica</span></div>
+                <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full marker-overig"></div><span class="text-[10px] text-gray-700">Overig</span></div>
+            </div>
+        </div>
+
+        <!-- Picking Overlay Alert -->
+        <div id="picking-alert" class="hidden absolute top-4 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg z-[1000] text-sm font-semibold animate-pulse pointer-events-none">
+            Klik ergens op de kaart om de locatie te prikken
+        </div>
+    </main>
+
+    <!-- 3. Rechter Sidebar (Opties & Toevoegen) -->
+    <aside class="w-full md:w-1/4 h-[33vh] md:h-screen bg-slate-50 shadow-2xl flex flex-col z-10 relative border-l border-gray-200">
+        <div class="p-5 border-b border-gray-200 bg-white">
+            <h2 class="text-lg font-bold text-gray-800">Reisplan Opties</h2>
+            <p class="text-xs text-gray-600">Voeg locaties toe aan A, B of C via de kaart.</p>
+        </div>
+
+        <div class="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-6">
+            <!-- Optie A -->
+            <div>
+                <h3 class="text-sm font-bold text-gray-800 mb-2 flex items-center"><span class="bg-blue-600 text-white w-5 h-5 rounded flex items-center justify-center mr-2 text-xs">A</span> Optie A</h3>
+                <div id="list-optie-A" class="space-y-2"></div>
+            </div>
+            <!-- Optie B -->
+            <div>
+                <h3 class="text-sm font-bold text-gray-800 mb-2 flex items-center"><span class="bg-blue-600 text-white w-5 h-5 rounded flex items-center justify-center mr-2 text-xs">B</span> Optie B</h3>
+                <div id="list-optie-B" class="space-y-2"></div>
+            </div>
+            <!-- Optie C -->
+            <div>
+                <h3 class="text-sm font-bold text-gray-800 mb-2 flex items-center"><span class="bg-blue-600 text-white w-5 h-5 rounded flex items-center justify-center mr-2 text-xs">C</span> Optie C</h3>
+                <div id="list-optie-C" class="space-y-2"></div>
+            </div>
+        </div>
+
+        <div class="p-4 border-t border-gray-200 bg-white">
+            <button onclick="openAddLocationModal()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded shadow transition-colors text-sm">
+                <i class="fa-solid fa-plus mr-2"></i> Nieuwe Locatie
+            </button>
+        </div>
+    </aside>
+
+    <!-- Modal voor Nieuwe Locatie -->
+    <div id="add-location-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-60 z-[2000] flex justify-center items-center backdrop-blur-sm">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 mx-4">
+            <h2 class="text-xl font-bold mb-4 text-gray-800">Locatie Toevoegen</h2>
+            <form onsubmit="saveLocation(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Naam</label>
+                    <input type="text" id="nl-name" required class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Omschrijving (Kort)</label>
+                    <input type="text" id="nl-desc" required class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none text-sm">
+                </div>
+                <div class="flex gap-4">
+                    <div class="flex-1">
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Breedtegraad (Lat)</label>
+                        <input type="number" step="any" id="nl-lat" required class="w-full px-3 py-2 border rounded bg-gray-50 text-sm">
+                    </div>
+                    <div class="flex-1">
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Lengtegraad (Lng)</label>
+                        <input type="number" step="any" id="nl-lng" required class="w-full px-3 py-2 border rounded bg-gray-50 text-sm">
+                    </div>
+                </div>
+                <button type="button" onclick="startPickingLocation()" class="w-full bg-blue-50 text-blue-700 border border-blue-200 py-1.5 rounded text-xs font-semibold hover:bg-blue-100 transition-colors">
+                    <i class="fa-solid fa-location-crosshairs mr-1"></i> Kies positie op de kaart
+                </button>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Regio</label>
+                    <select id="nl-region" class="w-full px-3 py-2 border rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                        <option value="Alpen">Alpen</option>
+                        <option value="Auvergne">Auvergne & Cantal</option>
+                        <option value="Pyreneeen">Pyreneeën</option>
+                        <option value="Occitanie">Occitanië</option>
+                        <option value="Corsica">Corsica</option>
+                        <option value="Overig">Overig</option>
+                    </select>
+                </div>
+                <div class="pt-4 flex justify-end gap-2 border-t mt-4">
+                    <button type="button" onclick="closeAddLocationModal()" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Annuleren</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded hover:bg-blue-700 shadow">Opslaan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // --- 1. GLOBALE STATE & DATA ---
+        window.userOptions = { A: [], B: [], C: [] };
+        window.pickingLocation = false;
+        let map;
+        let markersGroup;
+        let activeCategories = new Set();
+        let markerObjects = {}; 
+
+        const categoryGroups = {
+            "Activiteiten": [
+                "Mountainbiken (MTB)", "Wielrennen / Col-beklimmingen", "Zomerskiën", 
+                "Wandelen / Hiken", "Zwemmen", "Varen / Kajakken", 
+                "Paragliding / Vliegen", "Rafting / Canyoning", "Paardrijden", 
+                "Grotten verkennen", "Wintersport / Sneeuw", "Alpinisme / Bergbeklimmen"
+            ],
+            "Ontspanning": [
+                "Thermale baden / Wellness", "Wijnproeven / Terroir", "Gastronomisch Dineren (Michelin)", 
+                "Natuurfotografie", "Picknicken in de natuur", "Flora & Fauna (Marmotten)", 
+                "Yoga & Retreats", "Lokale Gastronomie (Kaas/Fondue)"
+            ],
+            "Accommodaties": [
+                "Luxe Hotels (5-sterren)", "Authentieke Bergchalets", "Premium Campings", 
+                "Gîtes & Lodges", "Table d'Hôtes", "Glamping / Stacaravans"
+            ],
+            "Bezienswaardigheden": [
+                "Hoge Bergtoppen & Cols", "Gletsjers", "Bergmeren (Lacs)", 
+                "Historische Dorpen & Stadjes", "Vulkanische Landschappen", 
+                "Nationale Parken (Écrins/Vanoise)", "Kasteelruïnes"
+            ],
+            "Civiele Wonderen": [
+                "Viaducten & Bruggen", "Kanalen & Waterwerken", 
+                "Spoorweggeschiedenis", "Moderne Architectuur", "UNESCO Werelderfgoed"
+            ]
+        };
+
+        const locations = [
+            // --- ALPEN ---
+            { id: 1, name: "Chamonix-Mont-Blanc", lat: 45.9237, lng: 6.8694, region: "Alpen", desc: "Startpunt voor extreme hoogalpiene prestaties en luxe.", icon: "fa-mountain", categories: ["Alpinisme / Bergbeklimmen", "Wintersport / Sneeuw", "Luxe Hotels (5-sterren)", "Hoge Bergtoppen & Cols"] },
+            { id: 2, name: "Aiguille du Midi (3.777m)", lat: 45.8773, lng: 6.8867, region: "Alpen", desc: "Spectaculaire lift met directe nabijheid tot Mont Blanc.", icon: "fa-tram", categories: ["Hoge Bergtoppen & Cols", "Gletsjers", "Natuurfotografie"] },
+            { id: 3, name: "Les Deux Alpes & Vénosc", lat: 45.0063, lng: 6.1226, region: "Alpen", desc: "Authentiek bergdorp Vénosc gekoppeld aan resort. Zomerskiën en MTB.", icon: "fa-person-biking", categories: ["Mountainbiken (MTB)", "Zomerskiën", "Authentieke Bergchalets"] },
+            { id: 4, name: "Alpe d’Huez & Le Bourg d’Oisans", lat: 45.0921, lng: 6.0694, region: "Alpen", desc: "Uitvalsbasis voor wielrenners. Bekend om de 21 haarspeldbochten.", icon: "fa-bicycle", categories: ["Wielrennen / Col-beklimmingen", "Mountainbiken (MTB)", "Hoge Bergtoppen & Cols"] },
+            { id: 5, name: "Lac Lauvitel", lat: 44.9667, lng: 6.0500, region: "Alpen", desc: "Exclusief, ongerept bergmeer in de Écrins.", icon: "fa-water", categories: ["Bergmeren (Lacs)", "Wandelen / Hiken", "Nationale Parken (Écrins/Vanoise)"] },
+            
+            // --- AUVERGNE & CANTAL ---
+            { id: 9, name: "Plomb du Cantal", lat: 45.0583, lng: 2.7619, region: "Auvergne", desc: "Top 10 berg van Frankrijk met vulkanisch panorama.", icon: "fa-volcano", categories: ["Vulkanische Landschappen", "Wandelen / Hiken"] },
+            { id: 10, name: "Camping Le Belvédère", lat: 44.9270, lng: 2.9830, region: "Auvergne", desc: "Premium chalets gericht op de vallei en het meer.", icon: "fa-campground", categories: ["Premium Campings", "Zwemmen"] },
+            { id: 12, name: "Domaine Pierre Goigoux", lat: 45.8150, lng: 3.1250, region: "Auvergne", desc: "Vulkanische wijnbouw voor zeldzame smaakdiepgang.", icon: "fa-wine-bottle", categories: ["Wijnproeven / Terroir", "Vulkanische Landschappen"] },
+
+            // --- PYRENEEËN ---
+            { id: 16, name: "Col du Tourmalet", lat: 42.9083, lng: 0.1453, region: "Pyreneeen", desc: "Legendarische wielercol uit de Tour de France.", icon: "fa-bicycle", categories: ["Wielrennen / Col-beklimmingen", "Hoge Bergtoppen & Cols"] },
+            { id: 17, name: "Balnéa Wellness", lat: 42.8050, lng: 0.4100, region: "Pyreneeen", desc: "Thermale revitalisatie aan een meer.", icon: "fa-spa", categories: ["Thermale baden / Wellness", "Bergmeren (Lacs)"] },
+            
+            // --- CIVIELE WONDEREN & NIEUWE LOCATIES (Uit tekst) ---
+            { id: 21, name: "Canal du Midi (Fonserannes/Agde)", lat: 43.3333, lng: 3.1986, region: "Occitanie", desc: "17e-eeuws watermeesterwerk van Pierre-Paul Riquet. Verbindt zeeën, inclusief de indrukwekkende sluizentrap van Fonserannes.", icon: "fa-water", categories: ["Kanalen & Waterwerken", "UNESCO Werelderfgoed"] },
+            { id: 22, name: "Viaduc de Garabit", lat: 44.9750, lng: 3.1775, region: "Auvergne", desc: "Eiffels meesterwerk over de Truyère. Innovatieve geklonken boogconstructie en vakwerk. Mooiste bij zonsondergang.", icon: "fa-bridge-water", categories: ["Viaducten & Bruggen", "Spoorweggeschiedenis"] },
+            { id: 23, name: "Viaduc de Bédarieux", lat: 43.6167, lng: 3.1500, region: "Occitanie", desc: "Imposant 19e-eeuws spoorwegviaduct van 716m en 37 stenen bogen.", icon: "fa-bridge", categories: ["Viaducten & Bruggen", "Spoorweggeschiedenis"] },
+            { id: 24, name: "Pont Séjourné (Train Jaune)", lat: 42.5186, lng: 2.1150, region: "Pyreneeen", desc: "Massieve tweekleurige boogconstructie van ontwerper Paul Séjourné, specifiek voor de Train Jaune.", icon: "fa-train", categories: ["Viaducten & Bruggen", "Spoorweggeschiedenis"] },
+            { id: 25, name: "Viaduc de Recoumène", lat: 44.9350, lng: 4.0280, region: "Auvergne", desc: "Onvoltooid basalt-viaduct met 21,5‰ helling. Prachtig wandeltracé (niet voor hoogtevrees).", icon: "fa-person-hiking", categories: ["Viaducten & Bruggen", "Spoorweggeschiedenis", "Wandelen / Hiken"] },
+            { id: 26, name: "Viaduct van Millau", lat: 44.0844, lng: 3.0225, region: "Occitanie", desc: "Hypermoderne tuibrug van staal over de Tarn. 343m hoog, meesterwerk van Eiffage en Norman Foster.", icon: "fa-bridge-suspension", categories: ["Viaducten & Bruggen", "Moderne Architectuur"] },
+            { id: 27, name: "Puy de Dôme", lat: 45.7723, lng: 2.9658, region: "Auvergne", desc: "Beklim de flanken via Chemin des Chèvres voor panoramazicht over o.a. A75 en vulkanen.", icon: "fa-mountain", categories: ["Vulkanische Landschappen", "Wandelen / Hiken", "Natuurfotografie"] },
+            { id: 28, name: "Bonifacio", lat: 41.3872, lng: 9.1594, region: "Corsica", desc: "Gedurfde maritieme fortificaties op 80m hoge kalkrotsen in zee.", icon: "fa-chess-rook", categories: ["Historische Dorpen & Stadjes", "Natuurfotografie"] }
+        ];
+
+        // --- 2. INITIALISATIE ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initMap();
+            renderFilters();
+            updateView();
+            updateOptionsPanel();
+            
+            document.getElementById('reset-filters').addEventListener('click', () => {
+                activeCategories.clear();
+                renderFilters();
+                updateView();
+            });
+        });
+
+        function initMap() {
+            map = L.map('map', { zoomControl: false }).setView([44.2, 3.8], 6);
+            L.control.zoom({ position: 'topright' }).addTo(map);
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+            }).addTo(map);
+
+            markersGroup = L.layerGroup().addTo(map);
+
+            // Click event for Add Location mode
+            map.on('click', function(e) {
+                if (window.pickingLocation) {
+                    document.getElementById('nl-lat').value = e.latlng.lat.toFixed(5);
+                    document.getElementById('nl-lng').value = e.latlng.lng.toFixed(5);
+                    
+                    window.pickingLocation = false;
+                    document.getElementById('map').classList.remove('picking-location');
+                    document.getElementById('picking-alert').classList.add('hidden');
+                    document.getElementById('add-location-modal').classList.remove('hidden');
+                }
+            });
+        }
+
+        // --- 3. UI GENERATIE & UPDATES ---
+        function renderFilters() {
+            const container = document.getElementById('filters-container');
+            container.innerHTML = '';
+
+            for (const [groupName, categories] of Object.entries(categoryGroups)) {
+                const groupDiv = document.createElement('div');
+                const groupTitle = document.createElement('h3');
+                groupTitle.className = "text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2";
+                
+                let iconClass = "fa-tag";
+                if(groupName === "Activiteiten") iconClass = "fa-person-running";
+                if(groupName === "Ontspanning") iconClass = "fa-spa";
+                if(groupName === "Accommodaties") iconClass = "fa-bed";
+                if(groupName === "Bezienswaardigheden") iconClass = "fa-camera";
+                if(groupName === "Civiele Wonderen") iconClass = "fa-bridge";
+                if(groupName === "Eigen Locaties") iconClass = "fa-user-pen";
+                
+                groupTitle.innerHTML = `<i class="fa-solid ${iconClass} mr-1 text-gray-400"></i>${groupName}`;
+                groupDiv.appendChild(groupTitle);
+
+                const chipsDiv = document.createElement('div');
+                chipsDiv.className = "flex flex-wrap gap-1.5";
+
+                categories.forEach(cat => {
+                    const chip = document.createElement('div');
+                    const isActive = activeCategories.has(cat);
+                    
+                    chip.className = `filter-chip px-2.5 py-1 rounded-full border text-[10px] font-medium ${
+                        isActive ? 'active shadow-sm' : 'border-gray-200 text-gray-600'
+                    }`;
+                    chip.innerText = cat;
+                    
+                    chip.addEventListener('click', () => {
+                        if (activeCategories.has(cat)) activeCategories.delete(cat);
+                        else activeCategories.add(cat);
+                        renderFilters(); // update UI classes
+                        updateView();
+                    });
+                    chipsDiv.appendChild(chip);
+                });
+                groupDiv.appendChild(chipsDiv);
+                container.appendChild(groupDiv);
+            }
+        }
+
+        function updateView() {
+            const filteredLocations = locations.filter(loc => {
+                if (activeCategories.size === 0) return true;
+                return loc.categories.some(c => activeCategories.has(c));
+            });
+
+            markersGroup.clearLayers();
+            markerObjects = {};
+            const bounds = [];
+
+            filteredLocations.forEach(loc => {
+                let colorClass = "marker-overig"; 
+                if (loc.region.includes("Alpen")) colorClass = "marker-alpen"; 
+                if (loc.region.includes("Auvergne")) colorClass = "marker-auvergne";
+                if (loc.region.includes("Pyreneeen")) colorClass = "marker-pyreneeen";
+                if (loc.region.includes("Occitanie")) colorClass = "marker-occitanie";
+                if (loc.region.includes("Corsica")) colorClass = "marker-corsica";
+
+                const customIcon = L.divIcon({
+                    html: `<div class="custom-marker ${colorClass}"><i class="fa-solid ${loc.icon}"></i></div>`,
+                    className: '', iconSize: [30, 30], iconAnchor: [15, 15], popupAnchor: [0, -15]
+                });
+
+                const isA = window.userOptions.A.includes(loc.id);
+                const isB = window.userOptions.B.includes(loc.id);
+                const isC = window.userOptions.C.includes(loc.id);
+
+                const popupContent = `
+                    <div class="p-1 w-60">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-0.5">${loc.region}</span>
+                        <h3 class="text-sm font-bold text-gray-900 mb-1 leading-tight">${loc.name}</h3>
+                        <p class="text-xs text-gray-600 mb-3">${loc.desc}</p>
+                        
+                        <div class="pt-2 border-t border-gray-100">
+                            <p class="text-[10px] font-semibold text-gray-500 mb-1">Toevoegen aan plan:</p>
+                            <div class="flex gap-1">
+                                <button onclick="toggleOption(${loc.id}, 'A', this)" class="flex-1 py-1 text-xs rounded border transition-colors ${isA ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'}">A</button>
+                                <button onclick="toggleOption(${loc.id}, 'B', this)" class="flex-1 py-1 text-xs rounded border transition-colors ${isB ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'}">B</button>
+                                <button onclick="toggleOption(${loc.id}, 'C', this)" class="flex-1 py-1 text-xs rounded border transition-colors ${isC ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'}">C</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                const marker = L.marker([loc.lat, loc.lng], { icon: customIcon })
+                    .bindPopup(popupContent)
+                    .addTo(markersGroup);
+                
+                markerObjects[loc.id] = marker;
+                bounds.push([loc.lat, loc.lng]);
+            });
+
+            if (bounds.length > 0) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
+        }
+
+        // --- 4. OPTIES LOGICA & ZIJBALK ---
+        window.toggleOption = function(locId, opt, btnElement) {
+            const list = window.userOptions[opt];
+            const index = list.indexOf(locId);
+            
+            if (index > -1) {
+                list.splice(index, 1);
+                if(btnElement) {
+                    btnElement.className = "flex-1 py-1 text-xs rounded border transition-colors bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100";
+                }
+            } else {
+                list.push(locId);
+                if(btnElement) {
+                    btnElement.className = "flex-1 py-1 text-xs rounded border transition-colors bg-blue-600 text-white border-blue-600";
+                }
+            }
+            updateOptionsPanel();
+        }
+
+        window.removeFromOption = function(locId, opt) {
+            const list = window.userOptions[opt];
+            const index = list.indexOf(locId);
+            if(index > -1) list.splice(index, 1);
+            updateOptionsPanel();
+            updateView(); // Reset kaart popups
+        }
+
+        window.focusLocation = function(id) {
+            const marker = markerObjects[id];
+            if (marker) {
+                map.setView(marker.getLatLng(), 13, { animate: true });
+                marker.openPopup();
+            }
+        }
+
+        function updateOptionsPanel() {
+            ['A', 'B', 'C'].forEach(opt => {
+                const container = document.getElementById(`list-optie-${opt}`);
+                container.innerHTML = '';
+                
+                const locIds = window.userOptions[opt];
+                if(locIds.length === 0) {
+                    container.innerHTML = `<p class="text-[11px] text-gray-400 italic">Geen locaties geselecteerd.</p>`;
+                    return;
+                }
+
+                locIds.forEach(id => {
+                    const loc = locations.find(l => l.id === id);
+                    if(!loc) return;
+
+                    const item = document.createElement('div');
+                    item.className = "px-2 py-1.5 bg-white border border-gray-200 rounded flex justify-between items-center shadow-sm";
+                    item.innerHTML = `
+                        <div class="truncate flex-1 text-xs font-semibold text-gray-700 cursor-pointer hover:text-blue-600" onclick="focusLocation(${loc.id})">
+                            ${loc.name}
+                        </div>
+                        <button onclick="removeFromOption(${loc.id}, '${opt}')" class="text-red-400 hover:text-red-600 ml-2">
+                            <i class="fa-solid fa-times text-xs"></i>
+                        </button>
+                    `;
+                    container.appendChild(item);
+                });
+            });
+        }
+
+        // --- 5. NIEUWE LOCATIE MODAL LOGICA ---
+        window.openAddLocationModal = function() {
+            document.getElementById('add-location-modal').classList.remove('hidden');
+        }
+        window.closeAddLocationModal = function() {
+            document.getElementById('add-location-modal').classList.add('hidden');
+            window.pickingLocation = false;
+            document.getElementById('map').classList.remove('picking-location');
+            document.getElementById('picking-alert').classList.add('hidden');
+        }
+        window.startPickingLocation = function() {
+            document.getElementById('add-location-modal').classList.add('hidden');
+            window.pickingLocation = true;
+            document.getElementById('map').classList.add('picking-location');
+            document.getElementById('picking-alert').classList.remove('hidden');
+        }
+
+        window.saveLocation = function(e) {
+            e.preventDefault();
+            const latStr = document.getElementById('nl-lat').value;
+            const lngStr = document.getElementById('nl-lng').value;
+            
+            if(!latStr || !lngStr) {
+                alert("Kies a.u.b. een locatie op de kaart of vul coördinaten in.");
+                return;
+            }
+
+            const newLoc = {
+                id: Date.now(),
+                name: document.getElementById('nl-name').value,
+                desc: document.getElementById('nl-desc').value,
+                lat: parseFloat(latStr),
+                lng: parseFloat(lngStr),
+                region: document.getElementById('nl-region').value,
+                icon: "fa-map-pin",
+                categories: ["Zelf Toegevoegd"]
+            };
+
+            // Voeg toe aan globale lijst
+            locations.push(newLoc);
+
+            // Voeg toe aan custom categorie als die nog niet bestaat
+            if(!categoryGroups["Eigen Locaties"]) {
+                categoryGroups["Eigen Locaties"] = ["Zelf Toegevoegd"];
+            }
+
+            closeAddLocationModal();
+            renderFilters();
+            updateView();
+            map.setView([newLoc.lat, newLoc.lng], 10, { animate: true });
+            
+            // Reset formulier
+            e.target.reset();
+        }
+    </script>
+</body>
+</html>

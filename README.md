@@ -12,3 +12,4 @@
 * [duurzaam dashboard](https://jurfijen.github.io/ingenjur/EnergieDashboard.html)
 * [KM Registratie](https://jurfijen.github.io/ingenjur/KMRegistratie.html)
 * [Vakantieplanner](https://jurfijen.github.io/ingenjur/GeminiVakantiePlanner.html)
+*[Kroatie roaming netwerk](https://jurfijen.github.io/ingenjur/KrRoaming.html)

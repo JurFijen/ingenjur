@@ -1,0 +1,240 @@
+
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Internetdekking op het water: Split - Vis</title>
+    
+    <!-- Tailwind CSS voor styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet CSS voor de interactieve kaart -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        /* Zorg dat de kaart de rest van de ruimte vult */
+        #map {
+            height: 100%;
+            width: 100%;
+            z-index: 10;
+        }
+        .custom-popup .leaflet-popup-content-wrapper {
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 h-screen flex flex-col font-sans overflow-hidden">
+
+    <!-- Header -->
+    <header class="bg-blue-600 text-white p-4 shadow-md z-20 flex justify-between items-center relative">
+        <div>
+            <h1 class="text-xl md:text-2xl font-bold flex items-center gap-2">
+                <i data-lucide="wifi"></i> Internetdekking: Split naar Vis
+            </h1>
+            <p class="text-blue-100 text-sm hidden md:block">Interactieve kaart met mobiele dekking op de Adriatische Zee</p>
+        </div>
+        <button id="toggleCoverage" class="bg-white text-blue-600 px-4 py-2 rounded-lg font-semibold shadow hover:bg-blue-50 transition-colors flex items-center gap-2 text-sm md:text-base">
+            <i data-lucide="layers" class="w-4 h-4"></i>
+            <span>Verberg Dekking</span>
+        </button>
+    </header>
+
+    <!-- Main Content (Map + Overlays) -->
+    <main class="flex-grow relative">
+        <div id="map"></div>
+
+        <!-- Legenda (Floating Panel) -->
+        <div class="absolute bottom-6 right-6 z-[1000] bg-white p-4 rounded-xl shadow-lg border border-slate-200 max-w-xs transition-transform transform origin-bottom-right hover:scale-105">
+            <h3 class="font-bold text-slate-800 mb-3 border-b pb-2">Signaalsterkte (Schatting)</h3>
+            <ul class="space-y-2 text-sm">
+                <li class="flex items-center gap-3">
+                    <span class="w-4 h-4 rounded-full bg-green-500 opacity-60 border border-green-700"></span>
+                    <span class="text-slate-700">Uitstekend (4G/5G)</span>
+                </li>
+                <li class="flex items-center gap-3">
+                    <span class="w-4 h-4 rounded-full bg-orange-400 opacity-60 border border-orange-600"></span>
+                    <span class="text-slate-700">Zwak/Wisselvallig (3G)</span>
+                </li>
+                <li class="flex items-center gap-3">
+                    <span class="w-4 h-4 rounded-full bg-red-500 opacity-60 border border-red-700"></span>
+                    <span class="text-slate-700">Minimaal / Geen signaal</span>
+                </li>
+                <li class="flex items-center gap-3 pt-2 border-t mt-2">
+                    <span class="w-6 h-1 bg-blue-500 border-t border-b border-dashed border-white"></span>
+                    <span class="text-slate-700">Veerboot / Vaarroute</span>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Info Box (Floating Panel) -->
+        <div class="absolute top-6 left-6 z-[1000] bg-white p-4 rounded-xl shadow-lg border border-slate-200 w-72 md:w-80 hidden sm:block">
+            <div class="flex items-start gap-3">
+                <div class="bg-amber-100 p-2 rounded-lg text-amber-600 mt-1">
+                    <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-slate-800">Let op roaming!</h3>
+                    <p class="text-xs text-slate-600 mt-1">
+                        Kroatië is EU-gebied (normale bundel geldig), maar pas op voor <b>maritieme netwerken</b> (satelliet) op grote veerboten. Deze vallen buiten je bundel en zijn erg duur!
+                    </p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <script>
+        // Initialiseer Lucide Icons
+        lucide.createIcons();
+
+        // 1. Initialiseer de kaart
+        // We centreren de kaart tussen Split en Vis op zoomniveau 10
+        const map = L.map('map', {
+            zoomControl: false // We zetten deze later op een betere plek
+        }).setView([43.25, 16.35], 10);
+
+        L.control.zoom({
+            position: 'bottomleft'
+        }).addTo(map);
+
+        // Voeg OpenStreetMap tiles toe
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+            attribution: '© OpenStreetMap contributors | Dekkingsdata is een indicatieve schatting'
+        }).addTo(map);
+
+        // 2. Groep voor de dekkingslagen zodat we ze aan/uit kunnen zetten
+        const coverageLayerGroup = L.layerGroup().addTo(map);
+
+        // 3. Dekkingsgebieden definiëren (Polygonen)
+
+        // Gebied 1: Kust, Split, Brač, Šolta, noord/oost Hvar (Uitstekende dekking)
+        const goodCoverageCoords1 = [
+            [43.60, 16.05], // Boven Trogir
+            [43.55, 16.85], // Voorbij Omiš
+            [43.10, 17.15], // Oostpunt Hvar
+            [43.12, 16.40], // Zuidkust Hvar
+            [43.20, 16.35], // Tussen Hvar en Vis
+            [43.35, 16.10], // West van Šolta
+            [43.60, 16.05]  // Terug naar start
+        ];
+
+        const goodZone = L.polygon(goodCoverageCoords1, {
+            color: '#15803d',
+            fillColor: '#22c55e',
+            fillOpacity: 0.3,
+            weight: 1
+        }).bindPopup('<b>Uitstekende Dekking (4G/5G)</b><br>Zendmasten langs de kust en op de bewoonde eilanden zorgen hier voor een snelle en stabiele verbinding.')
+          .addTo(coverageLayerGroup);
+
+        // Gebied 2: Vis Eiland (Goede dekking)
+        const visCoords = [
+            [43.08, 16.08], // Noordwest Vis
+            [43.08, 16.25], // Noordoost Vis
+            [43.00, 16.25], // Zuidoost Vis
+            [42.98, 16.08]  // Zuidwest Vis
+        ];
+        
+        const visZone = L.polygon(visCoords, {
+            color: '#15803d',
+            fillColor: '#22c55e',
+            fillOpacity: 0.35,
+            weight: 1
+        }).bindPopup('<b>Goede Dekking Vis</b><br>Rondom het eiland Vis en in havens zoals Vis-stad en Komiža is de verbinding weer uitstekend.')
+          .addTo(coverageLayerGroup);
+
+        // Gebied 3: Open water oversteek (Zwakke/Matige dekking)
+        const weakCoverageCoords = [
+            [43.20, 16.35], // Grens goede dekking Hvar
+            [43.12, 16.40],
+            [43.08, 16.25], // Grens Vis
+            [43.08, 16.08],
+            [43.25, 16.15]
+        ];
+
+        const weakZone = L.polygon(weakCoverageCoords, {
+            color: '#c2410c',
+            fillColor: '#f97316',
+            fillOpacity: 0.3,
+            weight: 1
+        }).bindPopup('<b>Zwak Signaal (3G/Edge)</b><br>Verder van de eilanden verzwakt het signaal. Streamen is lastig, maar Whatsapp berichten komen vaak nog wel door.')
+          .addTo(coverageLayerGroup);
+
+        // Gebied 4: Dieper zeegebied / Midden open water (Geen/Slechte dekking)
+        // Een cirkel in het midden van de zee tussen Hvar en Vis
+        const deadZone = L.circle([43.14, 16.20], {
+            color: '#b91c1c',
+            fillColor: '#ef4444',
+            fillOpacity: 0.3,
+            radius: 4000,
+            weight: 1
+        }).bindPopup('<b>Dead Zone</b><br>Grote kans dat je hier even helemaal geen mobiel signaal hebt totdat je dichter bij Vis of Hvar komt.')
+          .addTo(coverageLayerGroup);
+
+
+        // 4. Locaties (Markers)
+        const createMarker = (lat, lng, title, desc, isWarning = false) => {
+            const iconColor = isWarning ? '#ef4444' : '#2563eb';
+            const svgIcon = L.divIcon({
+                className: 'custom-div-icon',
+                html: `<div style="background-color: ${iconColor}; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.5);"></div>`,
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
+            });
+
+            return L.marker([lat, lng], {icon: svgIcon})
+                .addTo(map)
+                .bindPopup(`<div class="p-1"><h3 class="font-bold text-lg mb-1">${title}</h3><p class="text-sm">${desc}</p></div>`, { className: 'custom-popup' });
+        };
+
+        createMarker(43.5081, 16.4402, "Split (Vasteland)", "Vertrekpunt. Volledige 4G/5G dekking en EU-roaming actief.");
+        createMarker(43.1729, 16.4411, "Hvar Stad", "Populaire stop. Zendmasten op het eiland zorgen voor perfecte dekking in de haven en omliggende baaien.");
+        createMarker(43.0594, 16.1825, "Vis Stad", "Aankomst. Zodra je de baai invaart, pakt je telefoon het lokale netwerk (T-Hrvatski, A1) weer sterk op.");
+        createMarker(43.3850, 16.5450, "Brač Kanaal", "Het water tussen het vasteland en Brač. Het signaal 'kaatst' over het water, dus hier heb je gewoon snelle verbinding.");
+
+        // 5. Vaarroutes (Lijnen)
+        // Veerboot route Split -> Hvar -> Vis
+        const ferryRoute = L.polyline([
+            [43.5081, 16.4402], // Split
+            [43.32, 16.44],     // Door de zeestraat (Brač kanaal)
+            [43.1729, 16.4411], // Hvar
+            [43.14, 16.20],     // Oversteek open water (door de dead zone)
+            [43.0594, 16.1825]  // Vis
+        ], {
+            color: '#3b82f6',
+            weight: 3,
+            dashArray: '5, 10', // Stippellijn
+            opacity: 0.8
+        }).addTo(map).bindPopup('<b>Populaire Veerboot / Vaarroute</b><br>Zet op grote ferry\'s je dataroaming evt. uit om verbinding met een duur maritiem satellietnetwerk te voorkomen.');
+
+
+        // 6. Interactie: Toggle dekkingslaag
+        const toggleBtn = document.getElementById('toggleCoverage');
+        let coverageVisible = true;
+
+        toggleBtn.addEventListener('click', () => {
+            if (coverageVisible) {
+                map.removeLayer(coverageLayerGroup);
+                toggleBtn.innerHTML = '<i data-lucide="layers" class="w-4 h-4"></i><span>Toon Dekking</span>';
+                toggleBtn.classList.replace('text-blue-600', 'text-slate-600');
+                toggleBtn.classList.replace('bg-white', 'bg-slate-200');
+            } else {
+                map.addLayer(coverageLayerGroup);
+                toggleBtn.innerHTML = '<i data-lucide="layers" class="w-4 h-4"></i><span>Verberg Dekking</span>';
+                toggleBtn.classList.replace('text-slate-600', 'text-blue-600');
+                toggleBtn.classList.replace('bg-slate-200', 'bg-white');
+            }
+            coverageVisible = !coverageVisible;
+            lucide.createIcons(); // Herlaad het icon
+        });
+
+    </script>
+</body>
+</html>

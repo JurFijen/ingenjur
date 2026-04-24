@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Activiteit Reviewer & Heatmap</title>
+    
+    <!-- Tailwind CSS voor styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet CSS & JS voor de interactieve kaart -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <!-- Exifr voor het uitlezen van GPS data uit foto's (ondersteunt ook HEIC exif data) -->
+    <script src="https://cdn.jsdelivr.net/npm/exifr/dist/lite.umd.js"></script>
+
+    <!-- Heic2any om Apple's HEIC foto's in de browser weer te kunnen geven als JPG -->
+    <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+
+    <!-- FIT file parser -->
+    <script src="https://cdn.jsdelivr.net/npm/fit-file-parser@1.9.1/dist/fit-file-parser.min.js"></script>
+
+    <!-- FontAwesome voor iconen -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        /* Custom Styles voor Leaflet en UI aanpassingen */
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        #map { height: 100vh; width: 100%; z-index: 1; background-color: #1a1a1a;}
+        
+        /* Strava-achtige donkere tooltip */
+        .leaflet-tooltip.activity-tooltip {
+            background-color: rgba(0, 0, 0, 0.8);
+            border: 1px solid #444;
+            color: #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+            border-radius: 4px;
+            padding: 8px 12px;
+            font-size: 13px;
+        }
+        .leaflet-tooltip.activity-tooltip::before { border-top-color: rgba(0, 0, 0, 0.8); }
+        
+        /* Menu Sidebar layout */
+        #sidebar { transition: transform 0.3s ease-in-out; }
+        @media (max-width: 768px) {
+            #sidebar { position: absolute; height: 100%; transform: translateX(-100%); }
+            #sidebar.open { transform: translateX(0); }
+            #mobile-menu-btn { display: block; }
+        }
+        
+        /* Boomstructuur styling */
+        .tree-level { margin-left: 1rem; border-left: 1px dashed #cbd5e1; padding-left: 0.5rem; }
+        .tree-item { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; cursor: pointer; }
+        .tree-item:hover { background-color: #f1f5f9; }
+        .tree-caret { cursor: pointer; user-select: none; width: 20px; text-align: center; }
+        .tree-caret::before { content: "\25B6"; color: #64748b; display: inline-block; transition: transform 0.2s; font-size: 0.8rem;}
+        .tree-caret-down::before { transform: rotate(90deg); }
+        
+        /* Custom Scrollbar voor sidebar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* Photo Marker styling */
+        .photo-marker {
+            background-color: white; padding: 2px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            transition: transform 0.2s;
+        }
+        .photo-marker:hover { transform: scale(1.5); z-index: 1000 !important; }
+        .photo-marker img { border-radius: 2px; object-fit: cover; width: 40px; height: 40px; }
+        
+        /* Spinner */
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #fc4c02; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle;}
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden text-slate-800 bg-white">
+
+    <!-- JSON opslag voor geëxporteerde HTML -->
+    <script id="exported-data" type="application/json">{"activities":[], "photos":[]}</script>
+
+    <!-- Mobiele overlay knop -->
+    <button id="mobile-menu-btn" class="hidden absolute top-4 left-4 z-[1000] bg-white p-2 rounded shadow-md text-slate-700" onclick="document.getElementById('sidebar').classList.toggle('open')">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <!-- Sidebar Menu -->
+    <aside id="sidebar" class="w-80 flex flex-col border-r border-slate-200 bg-slate-50 z-[999] shadow-xl shrink-0 h-full">
+        
+        <!-- Header & Actie Knoppen -->
+        <div class="p-4 border-b border-slate-200 bg-white">
+            <h1 class="text-xl font-bold text-[#fc4c02] mb-4"><i class="fas fa-route mr-2"></i>Activity Reviewer</h1>
+            
+            <div class="space-y-2">
+                <!-- Activity Upload -->
+                <div>
+                    <input type="file" id="fileInput" multiple accept=".gpx,.tcx,.fit" class="hidden" onchange="app.handleFiles(event)">
+                    <button onclick="document.getElementById('fileInput').click()" class="w-full bg-[#fc4c02] hover:bg-[#e34402] text-white py-2 px-4 rounded text-sm font-semibold transition flex items-center justify-center">
+                        <i class="fas fa-upload mr-2"></i> Laad Bestanden (.fit, .gpx, .tcx)
+                    </button>
+                </div>
+                <!-- Photo Upload (Inclusief HEIC support) -->
+                <div class="flex space-x-2">
+                    <input type="file" id="photoInput" multiple accept="image/jpeg, image/png, image/jpg, image/heic, .heic" class="hidden" onchange="app.handlePhotos(event)">
+                    <button onclick="document.getElementById('photoInput').click()" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 py-2 px-2 rounded text-sm font-semibold transition flex items-center justify-center">
+                        <i class="fas fa-camera mr-2"></i> Foto's (.jpg, .heic)
+                    </button>
+                    <button id="togglePhotoBtn" onclick="app.togglePhotos()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 py-2 px-3 rounded text-sm transition" title="Foto's aan/uit">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+                <!-- HTML Export -->
+                <button onclick="app.exportHTML()" class="w-full bg-slate-800 hover:bg-slate-900 text-white py-2 px-4 rounded text-sm font-semibold transition flex items-center justify-center">
+                    <i class="fas fa-download mr-2"></i> Exporteer als HTML
+                </button>
+            </div>
+            <div id="loading-indicator" class="hidden mt-2 text-sm text-slate-600 text-center">
+                <div class="loader mr-2"></div> <span id="loading-text">Verwerken...</span>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="p-4 border-b border-slate-200 text-sm bg-white overflow-y-auto max-h-[30vh]">
+            <h2 class="font-semibold mb-2">Filters</h2>
+            
+            <div class="mb-3">
+                <label class="block text-xs text-slate-500 uppercase tracking-wider mb-1">Structuur</label>
+                <select id="grouping-select" onchange="app.changeGrouping(this.value)" class="w-full bg-slate-100 border-none rounded p-1 text-sm">
+                    <option value="ymd">Jaar > Maand > Dag</option>
+                    <option value="ywd">Jaar > Week > Dag</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="block text-xs text-slate-500 uppercase tracking-wider mb-1">Activiteit Type</label>
+                <div id="filter-type" class="flex flex-wrap gap-1"></div>
+            </div>
+
+            <div class="mb-3">
+                <label class="block text-xs text-slate-500 uppercase tracking-wider mb-1">Tijdsduur</label>
+                <div class="flex flex-wrap gap-1">
+                    <label class="inline-flex items-center bg-slate-100 px-2 py-1 rounded cursor-pointer"><input type="checkbox" class="mr-1" value="0-5" onchange="app.updateFilters('duration', this)"> 0-5m</label>
+                    <label class="inline-flex items-center bg-slate-100 px-2 py-1 rounded cursor-pointer"><input type="checkbox" class="mr-1" value="5-30" onchange="app.updateFilters('duration', this)"> 5-30m</label>
+                    <label class="inline-flex items-center bg-slate-100 px-2 py-1 rounded cursor-pointer"><input type="checkbox" class="mr-1" value="30-60" onchange="app.updateFilters('duration', this)"> 30-60m</label>
+                    <label class="inline-flex items-center bg-slate-100 px-2 py-1 rounded cursor-pointer"><input type="checkbox" class="mr-1" value="60+" onchange="app.updateFilters('duration', this)"> 60m+</label>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs text-slate-500 uppercase tracking-wider mb-1">Afstand</label>
+                <div class="flex flex-wrap gap-1">
+                    <label class="inline-flex items-center bg-slate-100 px-2 py-1 rounded cursor-pointer"><input type="checkbox" class="mr-1" value="<1" onchange="app.updateFilters('distance', this)"> &lt;1km</label>
+                    <label class="inline-flex items-center bg-slate-100 px-2 py-1 rounded cursor-pointer"><input type="checkbox" class="mr-1" value="1-5" onchange="app.updateFilters('distance', this)"> 1-5km</label>
+                    <label class="inline-flex items-center bg-slate-100 px-2 py-1 rounded cursor-pointer"><input type="checkbox" class="mr-1" value="5-10" onchange="app.updateFilters('distance', this)"> 5-10km</label>
+                    <label class="inline-flex items-center bg-slate-100 px-2 py-1 rounded cursor-pointer"><input type="checkbox" class="mr-1" value="10-30" onchange="app.updateFilters('distance', this)"> 10-30km</label>
+                    <label class="inline-flex items-center bg-slate-100 px-2 py-1 rounded cursor-pointer"><input type="checkbox" class="mr-1" value="30-100" onchange="app.updateFilters('distance', this)"> 30-100km</label>
+                    <label class="inline-flex items-center bg-slate-100 px-2 py-1 rounded cursor-pointer"><input type="checkbox" class="mr-1" value="100+" onchange="app.updateFilters('distance', this)"> 100km+</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Boomstructuur Acties -->
+        <div class="flex justify-between items-center bg-slate-100 p-2 border-b border-slate-200">
+            <button onclick="app.showAllActivities()" class="text-xs bg-white border border-slate-300 hover:bg-slate-50 px-2 py-1 rounded shadow-sm text-slate-700 font-semibold" title="Maak alle gefilterde activiteiten weer zichtbaar">
+                <i class="fas fa-eye"></i> Toon Alles
+            </button>
+            <div class="flex space-x-1 items-center">
+                <span class="text-xs text-slate-500 mr-1"><i class="fas fa-layer-group"></i> Niveau:</span>
+                <button onclick="app.setTreeLevel(1)" class="text-xs bg-white border border-slate-300 hover:bg-slate-50 px-2 py-1 rounded shadow-sm text-slate-700 w-6" title="Klap in tot Jaren">1</button>
+                <button onclick="app.setTreeLevel(2)" class="text-xs bg-white border border-slate-300 hover:bg-slate-50 px-2 py-1 rounded shadow-sm text-slate-700 w-6" title="Klap in tot Maanden/Weken">2</button>
+                <button onclick="app.setTreeLevel(3)" class="text-xs bg-white border border-slate-300 hover:bg-slate-50 px-2 py-1 rounded shadow-sm text-slate-700 w-6" title="Klap in tot Dagen">3</button>
+            </div>
+        </div>
+
+        <!-- Activiteiten Boomstructuur -->
+        <div id="treeView" class="flex-1 overflow-y-auto p-4 text-sm">
+            <div class="text-slate-400 text-center italic mt-10">Geen activiteiten geladen.</div>
+        </div>
+
+        <!-- Overzicht (Summary) -->
+        <div id="summary" class="p-4 border-t border-slate-200 bg-white">
+            <h3 class="font-semibold text-slate-700 mb-2">Zichtbare Selectie</h3>
+            <div class="grid grid-cols-2 gap-2 text-sm">
+                <div class="bg-slate-50 p-2 rounded">
+                    <div class="text-xs text-slate-500">Afstand</div>
+                    <div class="font-bold" id="sum-dist">-</div>
+                </div>
+                <div class="bg-slate-50 p-2 rounded">
+                    <div class="text-xs text-slate-500">Tijdsduur</div>
+                    <div class="font-bold" id="sum-time">-</div>
+                </div>
+                <div class="bg-slate-50 p-2 rounded col-span-2">
+                    <div class="text-xs text-slate-500">Gem. Snelheid</div>
+                    <div class="font-bold text-[#fc4c02]" id="sum-speed">-</div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Map Container -->
+    <main id="map" class="flex-1 relative"></main>
+
+    <!-- Javascript Applicatie Logica -->
+    <script>
+        const app = {
+            state: {
+                activities: [], 
+                photos: [], 
+                filters: { types: [], duration: [], distance: [] },
+                grouping: 'ymd', 
+                showPhotos: true,
+                mapStyle: 'dark'
+            },
+            map: null,
+            layers: {
+                tracks: L.featureGroup(),
+                photos: L.featureGroup()
+            },
+
+            init: function() {
+                this.loadFromURL();
+                this.initMap();
+                this.loadExportedData();
+                this.syncFilterUI();
+                this.updateUI();
+
+                // Luister naar knoppen "vorige/volgende" in browser navigatie
+                window.addEventListener('hashchange', () => {
+                    this.loadFromURL();
+                    this.syncFilterUI();
+                    this.applyFilters();
+                });
+            },
+
+            // --- URL STATUS & STATE ---
+            updateURL: function() {
+                const filterState = {
+                    t: this.state.filters.types,
+                    du: this.state.filters.duration,
+                    di: this.state.filters.distance,
+                    g: this.state.grouping
+                };
+                const jsonStr = JSON.stringify(filterState);
+                const encoded = btoa(jsonStr);
+                window.history.replaceState(null, '', '#filter:' + encoded);
+            },
+
+            loadFromURL: function() {
+                if (window.location.hash.startsWith('#filter:')) {
+                    const encoded = window.location.hash.replace('#filter:', '');
+                    try {
+                        const jsonStr = atob(encoded);
+                        const filterState = JSON.parse(jsonStr);
+                        this.state.filters.types = filterState.t || [];
+                        this.state.filters.duration = filterState.du || [];
+                        this.state.filters.distance = filterState.di || [];
+                        if (filterState.g) this.state.grouping = filterState.g;
+                    } catch(e) {
+                        console.warn("Kon filters niet laden uit URL", e);
+                    }
+                }
+            },
+
+            syncFilterUI: function() {
+                document.getElementById('grouping-select').value = this.state.grouping;
+                
+                const checkBoxes = (category, values) => {
+                    document.querySelectorAll(`input[onchange*="'${category}'"]`).forEach(cb => {
+                        cb.checked = values.includes(cb.value);
+                    });
+                };
+                
+                checkBoxes('duration', this.state.filters.duration);
+                checkBoxes('distance', this.state.filters.distance);
+            },
+
+            // --- KAART LOGICA ---
+            initMap: function() {
+                this.map = L.map('map', { zoomControl: false }).setView([52.1, 5.1], 8); 
+                L.control.zoom({ position: 'topright' }).addTo(this.map);
+
+                const baseLayers = {
+                    "Donker (Strava style)": L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                        attribution: '&copy; OpenStreetMap &copy; CARTO'
+                    }),
+                    "Sateliet (Esri)": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                        attribution: 'Tiles &copy; Esri'
+                    }),
+                    "Standaard (OSM)": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '&copy; OpenStreetMap contributors'
+                    }),
+                    "Hybride": L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+                        maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3'], attribution: '&copy; Google'
+                    })
+                };
+
+                baseLayers["Donker (Strava style)"].addTo(this.map);
+                L.control.layers(baseLayers, null, {position: 'bottomleft'}).addTo(this.map);
+
+                this.layers.tracks.addTo(this.map);
+                this.layers.photos.addTo(this.map);
+            },
+
+            // --- GPS LOGICA ---
+            toggleGPS: function() {
+                const btn = document.getElementById('gps-btn');
+
+                if (this.state.gpsWatchId !== null) {
+                    // Zet GPS uit
+                    navigator.geolocation.clearWatch(this.state.gpsWatchId);
+                    this.state.gpsWatchId = null;
+                    if (this.state.userLocationMarker) {
+                        this.map.removeLayer(this.state.userLocationMarker);
+                        this.state.userLocationMarker = null;
+                    }
+                    btn.classList.remove('text-[#fc4c02]');
+                    btn.classList.add('text-slate-700');
+                } else {
+                    // Zet GPS aan
+                    if (!navigator.geolocation) {
+                        alert("Geolocatie wordt niet ondersteund door je browser.");
+                        return;
+                    }
+
+                    btn.classList.add('text-[#fc4c02]');
+                    btn.classList.remove('text-slate-700');
+
+                    this.state.gpsWatchId = navigator.geolocation.watchPosition(
+                        (position) => {
+                            const lat = position.coords.latitude;
+                            const lon = position.coords.longitude;
+                            
+                            if (!this.state.userLocationMarker) {
+                                // Maak bolletje aan bij eerste fix en zoom in
+                                const icon = L.divIcon({
+                                    className: 'gps-marker',
+                                    iconSize: [16, 16],
+                                    iconAnchor: [8, 8]
+                                });
+                                this.state.userLocationMarker = L.marker([lat, lon], {icon: icon, zIndexOffset: 1000}).addTo(this.map);
+                                this.map.setView([lat, lon], 14); 
+                            } else {
+                                // Update de positie van het bolletje
+                                this.state.userLocationMarker.setLatLng([lat, lon]);
+                            }
+                        },
+                        (error) => {
+                            console.error("GPS Error: ", error);
+                            alert("Kan locatie niet bepalen. Controleer of je de browser toestemming hebt gegeven.");
+                            // Zet knop weer uit
+                            if(this.state.gpsWatchId !== null) this.toggleGPS(); 
+                        },
+                        { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
+                    );
+                }
+            },
+
+            // --- BESTANDEN VERWERKEN ---
+            handleFiles: async function(event) {
+                const files = event.target.files;
+                if (!files.length) return;
+                
+                this.showLoading(`Bezig met laden van ${files.length} bestand(en)...`);
+                
+                let processedCount = 0;
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    try {
+                        const extension = file.name.split('.').pop().toLowerCase();
+                        let activityData = null;
+
+                        if (extension === 'gpx' || extension === 'tcx') {
+                            const text = await file.text();
+                            activityData = extension === 'gpx' ? this.parseGPX(text, file.name) : this.parseTCX(text, file.name);
+                        } else if (extension === 'fit') {
+                            const buffer = await file.arrayBuffer();
+                            activityData = await this.parseFIT(buffer, file.name);
+                        }
+
+                        if (activityData && activityData.coordinates.length > 0) {
+                            activityData.id = 'act_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                            activityData.visible = true;
+                            activityData.filteredIn = true;
+                            
+                            const isDuplicate = this.state.activities.some(a => a.name === activityData.name && a.dateObj.getTime() === activityData.dateObj.getTime());
+                            if(!isDuplicate) {
+                                this.state.activities.push(activityData);
+                            }
+                        }
+                    } catch (error) {
+                        console.error(`Fout bij verwerken ${file.name}:`, error);
+                    }
+                    processedCount++;
+                    if(processedCount % 5 === 0) this.showLoading(`Verwerkt: ${processedCount}/${files.length}...`);
+                }
+
+                this.state.activities.sort((a, b) => b.dateObj - a.dateObj);
+                
+                this.buildTypeFilters();
+                
+                this.hideLoading();
+                this.updateUI();
+                if(this.state.activities.length > 0) {
+                    this.map.fitBounds(this.layers.tracks.getBounds());
+                }
+            },
+
+            parseGPX: function(text, fileName) {
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(text, "text/xml");
+                let name = xmlDoc.querySelector("trk > name")?.textContent || fileName;
+                let type = xmlDoc.querySelector("trk > type")?.textContent || "Unknown";
+                
+                const trkpts = xmlDoc.querySelectorAll("trkpt");
+                let coordinates = [];
+                let startTime = null;
+                let endTime = null;
+                let distanceMeters = 0;
+                let lastPt = null;
+
+                trkpts.forEach((pt) => {
+                    const lat = parseFloat(pt.getAttribute("lat"));
+                    const lon = parseFloat(pt.getAttribute("lon"));
+                    const timeStr = pt.querySelector("time")?.textContent;
+                    const time = timeStr ? new Date(timeStr) : null;
+
+                    if (!isNaN(lat) && !isNaN(lon)) {
+                        coordinates.push([lat, lon]);
+                        if (time) {
+                            if (!startTime) startTime = time;
+                            endTime = time;
+                        }
+                        if (lastPt) {
+                            distanceMeters += this.calcHaversine(lastPt.lat, lastPt.lon, lat, lon);
+                        }
+                        lastPt = {lat, lon};
+                    }
+                });
+
+                const dateObj = startTime || new Date();
+                const timeMs = endTime && startTime ? endTime.getTime() - startTime.getTime() : 0;
+                
+                return this.formatActivityData(name, type, dateObj, distanceMeters, timeMs, coordinates);
+            },
+
+            parseTCX: function(text, fileName) {
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(text, "text/xml");
+                const activity = xmlDoc.querySelector("Activity");
+                if(!activity) return null;
+
+                let name = activity.querySelector("Id")?.textContent || fileName;
+                let type = activity.getAttribute("Sport") || "Unknown";
+                
+                const trackpoints = xmlDoc.querySelectorAll("Trackpoint");
+                let coordinates = [];
+                let distanceMeters = 0;
+                let timeMs = 0;
+                let startTime = null;
+
+                trackpoints.forEach(pt => {
+                    const pos = pt.querySelector("Position");
+                    if (pos) {
+                        const lat = parseFloat(pos.querySelector("LatitudeDegrees")?.textContent);
+                        const lon = parseFloat(pos.querySelector("LongitudeDegrees")?.textContent);
+                        if (!isNaN(lat) && !isNaN(lon)) coordinates.push([lat, lon]);
+                    }
+                });
+
+                const lap = xmlDoc.querySelector("Lap");
+                if(lap) {
+                    startTime = new Date(lap.getAttribute("StartTime"));
+                    distanceMeters = parseFloat(lap.querySelector("DistanceMeters")?.textContent || 0);
+                    timeMs = parseFloat(lap.querySelector("TotalTimeSeconds")?.textContent || 0) * 1000;
+                }
+
+                if(!startTime && trackpoints.length > 0) {
+                     const firstTime = trackpoints[0].querySelector("Time")?.textContent;
+                     if(firstTime) startTime = new Date(firstTime);
+                }
+
+                return this.formatActivityData(name, type, startTime || new Date(), distanceMeters, timeMs, coordinates);
+            },
+
+            parseFIT: async function(buffer, fileName) {
+                return new Promise((resolve, reject) => {
+                    if (typeof FitParser === 'undefined') {
+                        resolve(null);
+                        return;
+                    }
+                    const fitParser = new FitParser({ force: true, speedUnit: 'km/h', lengthUnit: 'km', temperatureUnit: 'celsius', elapsedRecordField: true, mode: 'cascade'});
+                    fitParser.parse(buffer, (error, data) => {
+                        if (error) { reject(error); return; }
+                        let name = fileName;
+                        let type = "Unknown";
+                        let dateObj = new Date();
+                        let distKm = 0;
+                        let timeSecs = 0;
+                        let coordinates = [];
+
+                        if(data.sessions && data.sessions.length > 0) {
+                            const session = data.sessions[0];
+                            type = session.sport || "Unknown";
+                            dateObj = session.start_time ? new Date(session.start_time) : new Date();
+                            distKm = session.total_distance || 0;
+                            timeSecs = session.total_elapsed_time || 0;
+                        } else if (data.activity && data.activity.sessions && data.activity.sessions.length > 0) {
+                            type = data.activity.sessions[0].sport || "Unknown";
+                        }
+
+                        if(data.records && data.records.length > 0) {
+                            data.records.forEach(r => {
+                                if(r.position_lat && r.position_long) {
+                                    coordinates.push([r.position_lat, r.position_long]);
+                                }
+                            });
+                        }
+
+                        const distMeters = distKm * 1000;
+                        const timeMs = timeSecs * 1000;
+                        resolve(this.formatActivityData(name, type, dateObj, distMeters, timeMs, coordinates));
+                    });
+                });
+            },
+
+            formatActivityData: function(name, type, dateObj, distMeters, timeMs, coordinates) {
+                const distKm = distMeters / 1000;
+                const distNm = distMeters / 1852; 
+                const timeHrs = timeMs / (1000 * 60 * 60);
+                const speedKmh = timeHrs > 0 ? distKm / timeHrs : 0;
+                const speedKts = timeHrs > 0 ? distNm / timeHrs : 0;
+                type = type.charAt(0).toUpperCase() + type.slice(1);
+
+                return {
+                    name, type, dateObj,
+                    distKm, distNm, timeMs, speedKmh, speedKts,
+                    coordinates,
+                    bounds: coordinates.length > 0 ? L.latLngBounds(coordinates) : null
+                };
+            },
+
+            // --- FOTO LOGICA INCLUSIEF HEIC ---
+            handlePhotos: async function(event) {
+                const files = event.target.files;
+                if (!files.length) return;
+                
+                this.showLoading(`Bezig met het verwerken van ${files.length} foto's (HEIC conversie kan even duren)...`);
+                
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    try {
+                        // Lees exif data (exifr ondersteunt HEIC out of the box)
+                        const exifData = await exifr.gps(file);
+                        
+                        if (exifData && exifData.latitude && exifData.longitude) {
+                            let displayFile = file;
+
+                            // Als de afbeelding een HEIC of HEIF is, zet hem dan om naar JPG voor de browser
+                            if (file.type === 'image/heic' || file.type === 'image/heif' || file.name.toLowerCase().endsWith('.heic')) {
+                                const convertedBlob = await heic2any({
+                                    blob: file,
+                                    toType: "image/jpeg",
+                                    quality: 0.7 // Beetje compressie voor betere performance
+                                });
+                                // heic2any retourneert een array als de HEIC een image-sequence is
+                                displayFile = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+                            }
+
+                            // Bouw de base64 string op
+                            const base64 = await new Promise((resolve) => {
+                                const reader = new FileReader();
+                                reader.onload = (e) => resolve(e.target.result);
+                                reader.readAsDataURL(displayFile);
+                            });
+
+                            this.state.photos.push({
+                                id: 'photo_' + Date.now() + '_' + i,
+                                url: base64,
+                                lat: exifData.latitude,
+                                lon: exifData.longitude,
+                                visible: this.state.showPhotos
+                            });
+                        }
+                    } catch (err) {
+                        console.error(`Geen GPS in foto of fout bij omzetten van ${file.name}:`, err);
+                    }
+                }
+                
+                this.hideLoading();
+                this.drawPhotosOnMap();
+            },
+
+            togglePhotos: function() {
+                this.state.showPhotos = !this.state.showPhotos;
+                const btn = document.getElementById('togglePhotoBtn');
+                if(this.state.showPhotos) {
+                    btn.classList.add('bg-slate-300');
+                    this.map.addLayer(this.layers.photos);
+                } else {
+                    btn.classList.remove('bg-slate-300');
+                    this.map.removeLayer(this.layers.photos);
+                }
+            },
+
+            // --- FILTERING, KLEUREN & BOOMSTRUCTUUR ---
+            getColorForType: function(type) {
+                const t = type.toLowerCase();
+                if (t.includes('sail') || t.includes('zeil')) return '#f97316'; // Oranje
+                if (t.includes('cycl') || t.includes('bik') || t.includes('fiets') || t.includes('ride')) return '#3b82f6'; // Blauw
+                if (t.includes('walk') || t.includes('wandel')) return '#22c55e'; // Groen
+                if (t.includes('run') || t.includes('hardloop')) return '#ef4444'; // Rood
+                if (t.includes('swim') || t.includes('zwem')) return '#0ea5e9'; // Lichtblauw
+                if (t.includes('row') || t.includes('roei')) return '#8b5cf6'; // Paars
+                if (t.includes('hik')) return '#15803d'; // Donkergroen
+                if (t.includes('ski')) return '#cbd5e1'; // Grijswit
+                return '#64748b'; // Standaard lei-blauw
+            },
+
+            buildTypeFilters: function() {
+                const types = new Set(this.state.activities.map(a => a.type));
+                const container = document.getElementById('filter-type');
+                container.innerHTML = '';
+                types.forEach(type => {
+                    const isChecked = this.state.filters.types.includes(type) ? 'checked' : '';
+                    const color = this.getColorForType(type);
+                    const label = document.createElement('label');
+                    label.className = 'inline-flex items-center bg-slate-100 px-2 py-1 rounded cursor-pointer text-xs border-l-4';
+                    label.style.borderLeftColor = color;
+                    label.innerHTML = `<input type="checkbox" class="mr-1" value="${type}" ${isChecked} onchange="app.updateFilters('types', this)"> ${type}`;
+                    container.appendChild(label);
+                });
+            },
+
+            updateFilters: function(category, checkbox) {
+                const val = checkbox.value;
+                if (checkbox.checked) {
+                    this.state.filters[category].push(val);
+                } else {
+                    this.state.filters[category] = this.state.filters[category].filter(v => v !== val);
+                }
+                this.updateURL();
+                this.applyFilters();
+            },
+
+            applyFilters: function() {
+                const f = this.state.filters;
+                this.state.activities.forEach(a => {
+                    let passType = f.types.length === 0 || f.types.includes(a.type);
+                    
+                    let passDur = f.duration.length === 0;
+                    if(!passDur) {
+                        const min = a.timeMs / 60000;
+                        if(f.duration.includes('0-5') && min <= 5) passDur = true;
+                        if(f.duration.includes('5-30') && min > 5 && min <= 30) passDur = true;
+                        if(f.duration.includes('30-60') && min > 30 && min <= 60) passDur = true;
+                        if(f.duration.includes('60+') && min > 60) passDur = true;
+                    }
+
+                    let passDist = f.distance.length === 0;
+                    if(!passDist) {
+                        const km = a.distKm;
+                        if(f.distance.includes('<1') && km < 1) passDist = true;
+                        if(f.distance.includes('1-5') && km >= 1 && km <= 5) passDist = true;
+                        if(f.distance.includes('5-10') && km > 5 && km <= 10) passDist = true;
+                        if(f.distance.includes('10-30') && km > 10 && km <= 30) passDist = true;
+                        if(f.distance.includes('30-100') && km > 30 && km <= 100) passDist = true;
+                        if(f.distance.includes('100+') && km > 100) passDist = true;
+                    }
+
+                    a.filteredIn = passType && passDur && passDist;
+                    if(!a.filteredIn) a.visible = false;
+                });
+
+                this.updateUI();
+            },
+
+            changeGrouping: function(val) {
+                this.state.grouping = val;
+                this.updateURL();
+                this.updateUI();
+            },
+
+            buildTreeData: function() {
+                const tree = {};
+                this.state.activities.filter(a => a.filteredIn).forEach(act => {
+                    const d = act.dateObj;
+                    const year = d.getFullYear();
+                    
+                    if(!tree[year]) tree[year] = {};
+
+                    if (this.state.grouping === 'ymd') {
+                        const month = d.toLocaleString('nl-NL', { month: 'long' });
+                        const day = d.getDate();
+                        if(!tree[year][month]) tree[year][month] = {};
+                        if(!tree[year][month][day]) tree[year][month][day] = [];
+                        tree[year][month][day].push(act);
+                    } else if (this.state.grouping === 'ywd') {
+                        const week = this.getISOWeek(d);
+                        const dayName = d.toLocaleString('nl-NL', { weekday: 'long' });
+                        const weekKey = `Week ${week}`;
+                        if(!tree[year][weekKey]) tree[year][weekKey] = {};
+                        if(!tree[year][weekKey][dayName]) tree[year][weekKey][dayName] = [];
+                        tree[year][weekKey][dayName].push(act);
+                    }
+                });
+                return tree;
+            },
+
+            renderTreeHTML: function(data, level = 1, path = "") {
+                let html = '';
+                for (const key in data) {
+                    const val = data[key];
+                    const isArray = Array.isArray(val);
+                    const currentPath = path ? `${path}|${key}` : key;
+                    const id = `node-${currentPath.replace(/[^a-zA-Z0-9]/g, '-')}`;
+                    
+                    if (isArray) {
+                        html += `<div class="tree-level tree-group-content" id="${id}" data-level="${level}">`;
+                        html += `<div class="font-semibold text-slate-600 my-1">${key}</div>`;
+                        val.forEach(act => {
+                            const eyeClass = act.visible ? 'fa-eye text-slate-700' : 'fa-eye-slash text-slate-300';
+                            const color = this.getColorForType(act.type);
+                            html += `
+                                <div class="tree-item pl-2 text-xs border-l-2 ml-1 mb-1" style="border-left-color: ${color};">
+                                    <div class="flex-1 truncate hover:text-[#fc4c02]" onclick="app.isolateActivity('${act.id}')" title="${act.name}">${act.name}</div>
+                                    <div class="ml-2" onclick="app.toggleActivityVisibility('${act.id}')">
+                                        <i class="fas ${eyeClass}"></i>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        html += `</div>`;
+                    } else {
+                        const allActIDs = this.getAllActIdsInBranch(val);
+                        const allVisible = allActIDs.every(actId => {
+                            const a = this.state.activities.find(x => x.id === actId);
+                            return a && a.visible;
+                        });
+                        const eyeClass = allVisible ? 'fa-eye text-slate-700' : 'fa-eye-slash text-slate-300';
+
+                        html += `<div class="tree-level">`;
+                        html += `
+                            <div class="tree-item group-header">
+                                <span class="tree-caret tree-caret-down" data-level="${level}" onclick="this.classList.toggle('tree-caret-down'); document.getElementById('${id}').classList.toggle('hidden')"></span>
+                                <div class="flex-1 font-semibold text-slate-700 select-none" onclick="app.isolateGroup('${currentPath}')">${key}</div>
+                                <div onclick="app.toggleGroupVisibility('${currentPath}')"><i class="fas ${eyeClass}"></i></div>
+                            </div>
+                        `;
+                        html += `<div id="${id}" class="tree-group-content" data-level="${level}">`;
+                        html += this.renderTreeHTML(val, level + 1, currentPath);
+                        html += `</div></div>`;
+                    }
+                }
+                return html;
+            },
+
+            showAllActivities: function() {
+                this.state.activities.forEach(a => {
+                    if(a.filteredIn) a.visible = true;
+                });
+                this.updateUI();
+                this.fitBoundsVisible();
+            },
+
+            setTreeLevel: function(targetLevel) {
+                const groups = document.querySelectorAll('.tree-group-content');
+                const carets = document.querySelectorAll('.tree-caret');
+
+                groups.forEach(node => {
+                    const level = parseInt(node.getAttribute('data-level'));
+                    if (level < targetLevel) {
+                        node.classList.remove('hidden');
+                    } else {
+                        node.classList.add('hidden');
+                    }
+                });
+
+                carets.forEach(caret => {
+                    const level = parseInt(caret.getAttribute('data-level'));
+                    if (level < targetLevel) {
+                        caret.classList.add('tree-caret-down');
+                    } else {
+                        caret.classList.remove('tree-caret-down');
+                    }
+                });
+            },
+
+            getAllActIdsInBranch: function(node) {
+                let ids = [];
+                if(Array.isArray(node)) return node.map(a => a.id);
+                for(let k in node) ids = ids.concat(this.getAllActIdsInBranch(node[k]));
+                return ids;
+            },
+
+            getNodeByPath: function(pathStr) {
+                const parts = pathStr.split('|');
+                let curr = this.buildTreeData();
+                for(let p of parts) {
+                    if(curr[p]) curr = curr[p];
+                    else return null;
+                }
+                return curr;
+            },
+
+            isolateActivity: function(id) {
+                this.state.activities.forEach(a => {
+                    if(a.filteredIn) a.visible = (a.id === id);
+                });
+                this.updateUI();
+                const act = this.state.activities.find(a => a.id === id);
+                if(act && act.bounds) this.map.fitBounds(act.bounds);
+            },
+
+            toggleActivityVisibility: function(id) {
+                const act = this.state.activities.find(a => a.id === id);
+                if(act) act.visible = !act.visible;
+                this.updateUI();
+            },
+
+            isolateGroup: function(pathStr) {
+                const node = this.getNodeByPath(pathStr);
+                const ids = this.getAllActIdsInBranch(node);
+                
+                this.state.activities.forEach(a => {
+                    if(a.filteredIn) a.visible = ids.includes(a.id);
+                });
+                this.updateUI();
+                this.fitBoundsVisible();
+            },
+
+            toggleGroupVisibility: function(pathStr) {
+                const node = this.getNodeByPath(pathStr);
+                const ids = this.getAllActIdsInBranch(node);
+                
+                const firstAct = this.state.activities.find(a => a.id === ids[0]);
+                const newState = firstAct ? !firstAct.visible : true;
+
+                this.state.activities.forEach(a => {
+                    if(ids.includes(a.id)) a.visible = newState;
+                });
+                this.updateUI();
+            },
+
+            // --- UI & KAART UPDATES ---
+            updateUI: function() {
+                const treeData = this.buildTreeData();
+                const treeHtml = this.renderTreeHTML(treeData);
+                document.getElementById('treeView').innerHTML = treeHtml || '<div class="text-slate-400 text-center italic mt-10">Geen activiteiten gevonden.</div>';
+
+                this.drawTracksOnMap();
+                this.updateSummary();
+            },
+
+            drawTracksOnMap: function() {
+                // Verwijder altijd eerst bestaande pijltjes (voorkomt vastlopende pijltjes bij filteren)
+                if (this.state.activeDecorator) {
+                    this.map.removeLayer(this.state.activeDecorator);
+                    this.state.activeDecorator = null;
+                }
+                
+                this.layers.tracks.clearLayers();
+
+                this.state.activities.forEach(act => {
+                    if (act.filteredIn && act.visible && act.coordinates.length > 0) {
+                        const color = this.getColorForType(act.type);
+                        
+                        const polyline = L.polyline(act.coordinates, {
+                            color: color,
+                            weight: 3,
+                            opacity: 0.7,
+                            className: 'activity-path'
+                        });
+
+                        const tooltipContent = `
+                            <strong>${act.name}</strong><br>
+                            ${act.dateObj.toLocaleDateString('nl-NL')} ${act.dateObj.toLocaleTimeString('nl-NL')}<br>
+                            Type: ${act.type}<br>
+                            Afst: ${act.distKm.toFixed(2)} km / ${act.distNm.toFixed(2)} nm<br>
+                            Snelheid: ${act.speedKmh.toFixed(1)} km/u / ${act.speedKts.toFixed(1)} kts
+                        `;
+                        
+                        polyline.bindTooltip(tooltipContent, {
+                            sticky: true,
+                            className: 'activity-tooltip'
+                        });
+
+                        polyline.on('click', () => {
+                            // Fallback methode voor iframes en beveiligde omgevingen om te kopiëren
+                            const textArea = document.createElement("textarea");
+                            textArea.value = act.name;
+                            document.body.appendChild(textArea);
+                            textArea.select();
+                            try {
+                                document.execCommand('copy');
+                                alert(`Naam gekopieerd: ${act.name}`);
+                            } catch (err) {
+                                console.error('Kopiëren mislukt', err);
+                            }
+                            document.body.removeChild(textArea);
+                        });
+
+                        polyline.on('mouseover', function() { 
+                            this.setStyle({weight: 6, opacity: 1}); 
+                            this.bringToFront(); 
+                            
+                            // Voeg de richting pijltjes toe als decorator (met een veiligheidscheck of de lib geladen is)
+                            if (typeof L.polylineDecorator !== 'undefined' && L.Symbol && L.Symbol.arrowHead) {
+                                if (app.state.activeDecorator) {
+                                    app.map.removeLayer(app.state.activeDecorator);
+                                }
+                                
+                                app.state.activeDecorator = L.polylineDecorator(this, {
+                                    patterns: [
+                                        {
+                                            offset: 25, 
+                                            repeat: 100, // Teken elke 100 pixels een pijltje
+                                            symbol: L.Symbol.arrowHead({
+                                                pixelSize: 14, 
+                                                polygon: true, 
+                                                pathOptions: { stroke: true, weight: 2, color: '#ffffff', fillColor: color, fillOpacity: 1 }
+                                            })
+                                        }
+                                    ]
+                                }).addTo(app.map);
+                            }
+                        });
+                        
+                        polyline.on('mouseout', function() { 
+                            this.setStyle({weight: 3, opacity: 0.7}); 
+                            
+                            // Verwijder de richting pijltjes
+                            if (app.state.activeDecorator) {
+                                app.map.removeLayer(app.state.activeDecorator);
+                                app.state.activeDecorator = null;
+                            }
+                        });
+
+                        this.layers.tracks.addLayer(polyline);
+                    }
+                });
+            },
+
+            drawPhotosOnMap: function() {
+                this.layers.photos.clearLayers();
+                this.state.photos.forEach(p => {
+                    const icon = L.divIcon({
+                        html: `<div class="photo-marker"><img src="${p.url}"></div>`,
+                        className: '',
+                        iconSize: [44, 44],
+                        iconAnchor: [22, 22]
+                    });
+                    const marker = L.marker([p.lat, p.lon], {icon: icon});
+                    this.layers.photos.addLayer(marker);
+                });
+            },
+
+            updateSummary: function() {
+                let totDistKm = 0;
+                let totDistNm = 0;
+                let totTimeMs = 0;
+
+                const visibleActs = this.state.activities.filter(a => a.filteredIn && a.visible);
+                
+                visibleActs.forEach(a => {
+                    totDistKm += a.distKm;
+                    totDistNm += a.distNm;
+                    totTimeMs += a.timeMs;
+                });
+
+                const hrs = Math.floor(totTimeMs / 3600000);
+                const mins = Math.floor((totTimeMs % 3600000) / 60000);
+                const timeStr = `${hrs}u ${mins}m`;
+
+                const totTimeHrs = totTimeMs / 3600000;
+                const avgKmh = totTimeHrs > 0 ? totDistKm / totTimeHrs : 0;
+                const avgKts = totTimeHrs > 0 ? totDistNm / totTimeHrs : 0;
+
+                document.getElementById('sum-dist').innerHTML = `${totDistKm.toFixed(1)} km<br><span class="text-xs text-slate-400">${totDistNm.toFixed(1)} nm</span>`;
+                document.getElementById('sum-time').innerHTML = timeStr;
+                document.getElementById('sum-speed').innerHTML = `${avgKmh.toFixed(1)} km/u<br><span class="text-xs text-slate-400">${avgKts.toFixed(1)} kts</span>`;
+            },
+
+            fitBoundsVisible: function() {
+                if(this.layers.tracks.getLayers().length > 0) {
+                    this.map.fitBounds(this.layers.tracks.getBounds());
+                }
+            },
+
+            // --- EXPORT HTML ---
+            exportHTML: function() {
+                this.showLoading("Klaarmaken voor export...");
+                
+                const exportState = {
+                    activities: this.state.activities.map(a => ({
+                        ...a,
+                        dateObj: a.dateObj.toISOString(), 
+                        bounds: null 
+                    })),
+                    photos: this.state.photos
+                };
+
+                const jsonData = JSON.stringify(exportState);
+                let htmlContent = document.documentElement.outerHTML;
+                
+                const scriptStart = '<script id="exported-data" type="application/json">';
+                const scriptEnd = '<\/script>';
+                const regex = new RegExp(scriptStart + '.*?' + scriptEnd, 's');
+                htmlContent = htmlContent.replace(regex, scriptStart + jsonData + scriptEnd);
+
+                const blob = new Blob([htmlContent], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Activiteiten_Export_${new Date().toISOString().split('T')[0]}.html`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                this.hideLoading();
+            },
+
+            loadExportedData: function() {
+                try {
+                    const dataScript = document.getElementById('exported-data').textContent;
+                    const parsed = JSON.parse(dataScript);
+                    if (parsed && parsed.activities && parsed.activities.length > 0) {
+                        this.state.activities = parsed.activities.map(a => ({
+                            ...a,
+                            dateObj: new Date(a.dateObj),
+                            bounds: L.latLngBounds(a.coordinates)
+                        }));
+                        this.state.photos = parsed.photos || [];
+                        this.drawPhotosOnMap();
+                        this.buildTypeFilters();
+                        
+                        setTimeout(() => this.fitBoundsVisible(), 500);
+                    }
+                } catch(e) {
+                    // Geen voorgeladen data
+                }
+            },
+
+            // --- UTILS ---
+            calcHaversine: function(lat1, lon1, lat2, lon2) {
+                const R = 6371e3; 
+                const φ1 = lat1 * Math.PI/180;
+                const φ2 = lat2 * Math.PI/180;
+                const Δφ = (lat2-lat1) * Math.PI/180;
+                const Δλ = (lon2-lon1) * Math.PI/180;
+                const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                          Math.cos(φ1) * Math.cos(φ2) *
+                          Math.sin(Δλ/2) * Math.sin(Δλ/2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                return R * c;
+            },
+
+            getISOWeek: function(d) {
+                const date = new Date(d.getTime());
+                date.setHours(0, 0, 0, 0);
+                date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
+                const week1 = new Date(date.getFullYear(), 0, 4);
+                return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+            },
+
+            showLoading: function(text) {
+                document.getElementById('loading-indicator').classList.remove('hidden');
+                document.getElementById('loading-text').innerText = text;
+            },
+            hideLoading: function() {
+                document.getElementById('loading-indicator').classList.add('hidden');
+            }
+        };
+
+        window.addEventListener('DOMContentLoaded', () => {
+            app.init();
+        });
+    </script>
+</body>
+</html>

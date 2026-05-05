@@ -1,0 +1,1400 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPS Tracker Recap</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Tailwind configureren voor handmatige dark mode class
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+    <!-- Babel voor JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        body { margin: 0; padding: 0; overflow: hidden; }
+        
+        /* Custom Scrollbar voor Light & Dark theme */
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        .dark .custom-scroll::-webkit-scrollbar-track { background: #1e293b; }
+        .dark .custom-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        .dark .custom-scroll::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        
+        /* Leaflet Map Styling (Light/Dark) */
+        .leaflet-container { outline: 0; background: #e5e7eb; }
+        .dark .leaflet-container { background: #0f172a; }
+        .dark .leaflet-bar a { background-color: #1e293b; color: #cbd5e1; border-color: #334155; }
+        .dark .leaflet-bar a:hover { background-color: #334155; color: #fff; }
+        .dark .leaflet-control-attribution { background: rgba(15, 23, 42, 0.7) !important; color: #94a3b8 !important; }
+        .dark .leaflet-control-attribution a { color: #38bdf8 !important; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 transition-colors duration-300 dark:bg-slate-900 dark:text-slate-100">
+    <div id="root"></div>
+
+    <script>
+        // Initiele data (voor HTML export fallback)
+        window.__INITIAL_DATA__ = window.__INITIAL_DATA__ || {};
+    </script>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+        // --- Hulpfuncties ---
+        
+        const calculateDistance = (lat1, lon1, lat2, lon2) => {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        };
+
+        const getNextColor = (index) => {
+            const colors = ['#38bdf8', '#fbbf24', '#f87171', '#34d399', '#a78bfa', '#f472b6', '#fb923c', '#2dd4bf'];
+            return colors[index % colors.length];
+        };
+
+        const interpolateColor = (val, min, max, palette = 'garmin') => {
+            if (max === min || isNaN(val)) return '#3b82f6';
+            let pct = (val - min) / (max - min);
+            pct = Math.max(0, Math.min(1, pct));
+            
+            let stops = [];
+            if (palette === 'garmin') {
+                stops = [
+                    { p: 0, c: [59, 130, 246] },   // blue
+                    { p: 0.25, c: [6, 182, 212] }, // cyan
+                    { p: 0.5, c: [34, 197, 94] },  // green
+                    { p: 0.75, c: [234, 179, 8] }, // yellow
+                    { p: 1, c: [239, 68, 68] }     // red
+                ];
+            }
+            
+            let lower = stops[0], upper = stops[stops.length - 1];
+            for(let i=0; i<stops.length-1; i++) {
+                if (pct >= stops[i].p && pct <= stops[i+1].p) {
+                    lower = stops[i];
+                    upper = stops[i+1];
+                    break;
+                }
+            }
+            
+            const range = upper.p - lower.p;
+            const rangePct = range === 0 ? 0 : (pct - lower.p) / range;
+            
+            const r = Math.round(lower.c[0] + (upper.c[0] - lower.c[0]) * rangePct);
+            const g = Math.round(lower.c[1] + (upper.c[1] - lower.c[1]) * rangePct);
+            const b = Math.round(lower.c[2] + (upper.c[2] - lower.c[2]) * rangePct);
+            
+            return `rgb(${r},${g},${b})`;
+        };
+
+        // --- Parsers ---
+
+        const parseGPX = async (file, colorIndex) => {
+            const text = await file.text();
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(text, "text/xml");
+            
+            let name = xmlDoc.querySelector("metadata > name")?.textContent || file.name;
+            let dateStr = xmlDoc.querySelector("metadata > time")?.textContent;
+            let date = dateStr ? new Date(dateStr) : null;
+
+            const trkpts = xmlDoc.querySelectorAll("trkpt");
+            const points = [];
+            let totalDist = 0;
+            let prevPt = null;
+            let startTime = null;
+            
+            let totalEleGain = 0;
+            let maxSpeedKts = 0;
+
+            Array.from(trkpts).forEach(pt => {
+                const lat = parseFloat(pt.getAttribute("lat"));
+                const lon = parseFloat(pt.getAttribute("lon"));
+                const ele = parseFloat(pt.querySelector("ele")?.textContent || 0);
+                const timeStr = pt.querySelector("time")?.textContent;
+                const time = timeStr ? new Date(timeStr) : null;
+
+                let elapsedTime = 0;
+                if (time) {
+                    if (!startTime) startTime = time;
+                    elapsedTime = (time - startTime) / 60000;
+                }
+
+                let hr = null;
+                let cad = null;
+                const hrNode = pt.getElementsByTagNameNS("*", "hr")[0] || pt.querySelector("hr");
+                if (hrNode) hr = parseInt(hrNode.textContent);
+                const cadNode = pt.getElementsByTagNameNS("*", "cad")[0] || pt.querySelector("cad");
+                if (cadNode) cad = parseInt(cadNode.textContent);
+
+                if (prevPt) {
+                    const d = calculateDistance(prevPt.lat, prevPt.lon, lat, lon);
+                    totalDist += d;
+                    if (ele > prevPt.ele) totalEleGain += (ele - prevPt.ele);
+                }
+
+                let speed = 0;
+                if (prevPt && time && prevPt.time) {
+                    const timeDiff = (time - prevPt.time) / 1000;
+                    const distDiff = totalDist - prevPt.totalDist;
+                    if (timeDiff > 0) speed = (distDiff / (timeDiff / 3600));
+                }
+
+                if (!date && time) date = time;
+
+                const totalDistNM = totalDist * 0.539957;
+                const speedKts = speed * 0.539957;
+                
+                if (speedKts > maxSpeedKts) maxSpeedKts = speedKts;
+
+                const currentPt = { lat, lon, ele, time, hr, cad, totalDist, totalDistNM, speed, speedKts, elapsedTime };
+                points.push(currentPt);
+                prevPt = currentPt;
+            });
+
+            const totalTimeMin = points.length > 0 ? points[points.length - 1].elapsedTime : 0;
+            const finalDistNM = points.length > 0 ? points[points.length - 1].totalDistNM : 0;
+            const avgSpeedKts = totalTimeMin > 0 ? finalDistNM / (totalTimeMin / 60) : 0;
+
+            return {
+                id: Math.random().toString(36).substr(2, 9),
+                filename: file.name,
+                name,
+                date: date || new Date(file.lastModified),
+                points,
+                stats: { totalDistNM: finalDistNM, totalEleGain, maxSpeedKts, avgSpeedKts, totalTimeMin },
+                color: getNextColor(colorIndex),
+                visible: true,
+                hasHR: points.some(p => p.hr !== null),
+                hasSpeed: points.some(p => p.speed > 0)
+            };
+        };
+
+        const parseTidalXML = async (file) => {
+            const text = await file.text();
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(text, "text/xml");
+
+            const id = xmlDoc.querySelector("Info > ID")?.textContent || "Onbekend";
+            const name = xmlDoc.querySelector("Info > Name")?.textContent || "";
+            const lat = parseFloat(xmlDoc.querySelector("Info > Lat")?.textContent);
+            const lon = parseFloat(xmlDoc.querySelector("Info > Lon")?.textContent);
+
+            const rateNodes = xmlDoc.querySelectorAll("Rates > Rate");
+            const rates = [];
+            
+            Array.from(rateNodes).forEach(node => {
+                const timeStr = node.querySelector("Time")?.textContent;
+                const speedMs = parseFloat(node.querySelector("Speed")?.textContent);
+                const speed = speedMs * 1.943844; // m/s to kts
+                const bearing = parseFloat(node.querySelector("Bearing")?.textContent);
+
+                if (timeStr && !isNaN(speed) && !isNaN(bearing)) {
+                    const parts = timeStr.trim().split(/\s+/);
+                    if (parts.length === 2) {
+                        const [d, m, y] = parts[0].split('/');
+                        const [hr, min] = parts[1].split(':');
+                        const isoStr = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}T${hr.padStart(2, '0')}:${min.padStart(2, '0')}:00+01:00`;
+                        const timeMs = new Date(isoStr).getTime();
+                        if (!isNaN(timeMs)) rates.push({ timeMs, speed, bearing });
+                    }
+                }
+            });
+
+            rates.sort((a, b) => a.timeMs - b.timeMs);
+            return { id, name, lat, lon, rates, filename: file.name };
+        };
+
+        const getClosestRate = (rates, targetTimeMs) => {
+            if (!rates || rates.length === 0) return null;
+            let left = 0, right = rates.length - 1;
+
+            if (targetTimeMs <= rates[0].timeMs) return rates[0];
+            if (targetTimeMs >= rates[right].timeMs) return rates[right];
+
+            while (left <= right) {
+                const mid = Math.floor((left + right) / 2);
+                const midTime = rates[mid].timeMs;
+
+                if (midTime === targetTimeMs) return rates[mid];
+                if (midTime < targetTimeMs) left = mid + 1;
+                else right = mid - 1;
+            }
+
+            const leftDiff = rates[left] ? Math.abs(rates[left].timeMs - targetTimeMs) : Infinity;
+            const rightDiff = rates[right] ? Math.abs(rates[right].timeMs - targetTimeMs) : Infinity;
+
+            return leftDiff < rightDiff ? rates[left] : rates[right];
+        };
+
+        // --- Iconen ---
+        const Icons = {
+            Folder: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-1.22-1.8A2 2 0 0 0 8.53 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>,
+            List: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>,
+            Calendar: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>,
+            Eye: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>,
+            EyeOff: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>,
+            Sun: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>,
+            Moon: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>,
+            ChevronUp: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>,
+            ChevronDown: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>,
+            Menu: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>,
+            PanelLeftClose: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><path d="M9 3v18"/><path d="m16 15-3-3 3-3"/></svg>,
+            Waves: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/></svg>,
+            Download: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
+            MapPin: (props) => <svg xmlns="http://www.w3.org/2000/svg" width={props.width || 16} height={props.height || 16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>,
+            Close: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+            Bookmark: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>,
+            Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>,
+            PenTool: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 19 7-7 3 3-7 7-3-3z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="m2 2 7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+        };
+
+        // --- Component voor de grafieken ---
+        const verticalLinePlugin = {
+            id: 'verticalLine',
+            afterDraw: (chart) => {
+                const xVal = chart.config.options.plugins.verticalLine?.xVal;
+                if (xVal !== undefined && xVal !== null) {
+                    const ctx = chart.ctx;
+                    const xAxis = chart.scales.x;
+                    const yAxis = chart.scales.y;
+                    const xPixel = xAxis.getPixelForValue(xVal);
+                    
+                    if (xPixel >= xAxis.left && xPixel <= xAxis.right) {
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.moveTo(xPixel, yAxis.top);
+                        ctx.lineTo(xPixel, yAxis.bottom);
+                        ctx.lineWidth = 1;
+                        ctx.strokeStyle = '#f87171';
+                        ctx.setLineDash([5, 5]);
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+                }
+            }
+        };
+        Chart.register(verticalLinePlugin);
+
+        const GpxChart = ({ files, title, dataKey, xAxisKey = 'totalDistNM', yAxisLabel, xAxisLabel = 'Afstand (NM)', selectedPoint, onPointHover, isDarkMode }) => {
+            const canvasRef = useRef(null);
+            const chartInstance = useRef(null);
+            const [isExpanded, setIsExpanded] = useState(false); // Standaard ingeklapt
+
+            const textColor = isDarkMode ? '#94a3b8' : '#64748b';
+            const gridColor = isDarkMode ? '#334155' : '#e2e8f0';
+            const tooltipBg = isDarkMode ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.9)';
+            const tooltipTitle = isDarkMode ? '#fff' : '#0f172a';
+            const tooltipBody = isDarkMode ? '#cbd5e1' : '#334155';
+
+            useEffect(() => {
+                if (!canvasRef.current) return;
+                const visibleFiles = files.filter(f => f.visible);
+                if (dataKey === 'hr' && !visibleFiles.some(f => f.hasHR)) return;
+
+                let datasets = visibleFiles.map(f => ({
+                    label: f.name,
+                    data: f.points.map(p => ({ x: p[xAxisKey], y: p[dataKey] })),
+                    borderColor: f.color,
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    pointHoverRadius: 5,
+                    tension: 0.1,
+                    spanGaps: true
+                }));
+
+                if (chartInstance.current) {
+                    chartInstance.current.data.datasets = datasets;
+                    chartInstance.current.options.plugins.verticalLine.xVal = selectedPoint?.point?.[xAxisKey];
+                    chartInstance.current.options.plugins.tooltip.backgroundColor = tooltipBg;
+                    chartInstance.current.options.plugins.tooltip.titleColor = tooltipTitle;
+                    chartInstance.current.options.plugins.tooltip.bodyColor = tooltipBody;
+                    chartInstance.current.options.scales.x.ticks.color = textColor;
+                    chartInstance.current.options.scales.x.title.color = textColor;
+                    chartInstance.current.options.scales.x.grid.color = gridColor;
+                    chartInstance.current.options.scales.y.ticks.color = textColor;
+                    chartInstance.current.options.scales.y.title.color = textColor;
+                    chartInstance.current.options.scales.y.grid.color = gridColor;
+                    chartInstance.current.update();
+                } else {
+                    const ctx = canvasRef.current.getContext('2d');
+                    chartInstance.current = new Chart(ctx, {
+                        type: 'line',
+                        data: { datasets },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            animation: false,
+                            interaction: { mode: 'index', intersect: false },
+                            plugins: {
+                                legend: { display: false },
+                                title: { display: false },
+                                tooltip: {
+                                    backgroundColor: tooltipBg,
+                                    titleColor: tooltipTitle,
+                                    bodyColor: tooltipBody,
+                                    borderColor: gridColor,
+                                    borderWidth: 1,
+                                    callbacks: {
+                                        title: function(context) {
+                                            if (context.length > 0) {
+                                                let val = context[0].parsed.x;
+                                                if (xAxisKey === 'elapsedTime') {
+                                                    const h = Math.floor(val / 60);
+                                                    const m = Math.floor(val % 60);
+                                                    return `Tijd: ${h.toString().padStart(2, '0')}u ${m.toString().padStart(2, '0')}m`;
+                                                } else {
+                                                    let valKm = val / 0.539957;
+                                                    return `Afstand: ${val.toFixed(2)} NM (${valKm.toFixed(2)} km)`;
+                                                }
+                                            }
+                                            return '';
+                                        },
+                                        label: function(context) {
+                                            let label = context.dataset.label || '';
+                                            if (label) label += ': ';
+                                            if (context.parsed.y !== null) {
+                                                let val = context.parsed.y;
+                                                if (dataKey === 'speedKts') {
+                                                    label += `${val.toFixed(1)} kts (${(val / 0.539957).toFixed(1)} km/u)`;
+                                                } else if (dataKey === 'totalDistNM') {
+                                                    let valKm = val / 0.539957;
+                                                    label += `${val.toFixed(2)} NM (${valKm.toFixed(2)} km)`;
+                                                } else if (dataKey === 'hr') {
+                                                    label += `${val.toFixed(0)} bpm`;
+                                                }
+                                            }
+                                            return label;
+                                        }
+                                    }
+                                },
+                                verticalLine: { xVal: selectedPoint?.point?.[xAxisKey] }
+                            },
+                            scales: {
+                                x: { type: 'linear', title: { display: true, text: xAxisLabel, color: textColor }, ticks: { color: textColor }, grid: { color: gridColor } },
+                                y: { title: { display: true, text: yAxisLabel, color: textColor }, ticks: { color: textColor }, grid: { color: gridColor } }
+                            },
+                            onHover: (event, elements, chart) => {
+                                if (elements.length > 0 && onPointHover) {
+                                    const element = elements[0];
+                                    const datasetIndex = element.datasetIndex;
+                                    const dataIndex = element.index;
+                                    
+                                    const fileIndex = datasetIndex % visibleFiles.length; 
+                                    const file = visibleFiles[fileIndex];
+                                    
+                                    if (file && file.points[dataIndex]) {
+                                        onPointHover({ fileId: file.id, point: file.points[dataIndex], fileColor: file.color, fileName: file.name });
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            }, [files, selectedPoint, dataKey, xAxisKey, isDarkMode]);
+
+            useEffect(() => {
+                return () => {
+                    if (chartInstance.current) {
+                        chartInstance.current.destroy();
+                        chartInstance.current = null;
+                    }
+                };
+            }, []);
+
+            if (dataKey === 'hr' && !files.filter(f => f.visible).some(f => f.hasHR)) return null;
+
+            return (
+                <div className="w-full bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-none overflow-hidden transition-colors duration-300">
+                    <div 
+                        className="flex justify-between items-center p-3 cursor-pointer bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700/80 transition-colors border-b border-transparent dark:border-transparent"
+                        style={{ borderBottomColor: isExpanded ? (isDarkMode ? '#334155' : '#e2e8f0') : 'transparent' }}
+                        onClick={() => setIsExpanded(!isExpanded)}
+                    >
+                        <h3 className="font-semibold text-slate-700 dark:text-slate-300 text-sm flex items-center gap-2">
+                            {title}
+                        </h3>
+                        <div className="flex items-center gap-3">
+                            <button className="text-slate-500 dark:text-slate-400 transition-transform duration-300 ease-in-out" style={{ transform: isExpanded ? 'rotate(0deg)' : 'rotate(180deg)' }}>
+                                <Icons.ChevronUp />
+                            </button>
+                        </div>
+                    </div>
+                    <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isExpanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+                        <div className="overflow-hidden">
+                            <div className="h-48 p-2"><canvas ref={canvasRef}></canvas></div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- Hoofd Applicatie Component ---
+        const App = () => {
+            const [appName, setAppName] = useState(() => (window.__INITIAL_DATA__ && window.__INITIAL_DATA__.appName) || 'GPS Tracker Recap');
+            
+            const [files, setFiles] = useState(() => {
+                if (window.__INITIAL_DATA__ && window.__INITIAL_DATA__.files) {
+                    return window.__INITIAL_DATA__.files.map(f => ({
+                        ...f,
+                        date: new Date(f.date),
+                        points: f.points.map(p => ({
+                            ...p,
+                            time: p.time ? new Date(p.time) : null
+                        }))
+                    }));
+                }
+                return [];
+            });
+            const [tidalStations, setTidalStations] = useState(() => (window.__INITIAL_DATA__ && window.__INITIAL_DATA__.tidalStations) || []);
+            const [showTidal, setShowTidal] = useState(true);
+            const [tidalSyncMode, setTidalSyncMode] = useState('time'); 
+
+            // Viewpoints State
+            const [viewpoints, setViewpoints] = useState(() => (window.__INITIAL_DATA__ && window.__INITIAL_DATA__.viewpoints) || []);
+            const [activeViewpointId, setActiveViewpointId] = useState(null);
+            
+            // Draw Mode State (Markup)
+            const [drawMode, setDrawMode] = useState('none'); // 'none', 'point', 'line'
+            const [currentLine, setCurrentLine] = useState([]);
+            
+            const [viewMode, setViewMode] = useState('filename'); // filename, date, viewpoints
+            const [sortAlpha, setSortAlpha] = useState(false); // Voor alfabetisch sorteren
+
+            const [selectedPoint, setSelectedPoint] = useState(null);
+            const [colorMode, setColorMode] = useState('none'); 
+            const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+            const [isDarkMode, setIsDarkMode] = useState(true); 
+            
+            const mapRef = useRef(null);
+            const mapInstance = useRef(null);
+            const baseLayerRef = useRef(null);
+            const nauticalLayerRef = useRef(null);
+            const polylinesRef = useRef({});
+            const markerRef = useRef(null);
+            const tidalMarkersRef = useRef({});
+            const markupLayerRef = useRef(null);
+            
+            const filesRef = useRef(files); 
+            const drawStateRef = useRef({ mode: 'none', activeId: null, currentLine: [] });
+
+            useEffect(() => { filesRef.current = files; }, [files]);
+            useEffect(() => {
+                drawStateRef.current = { mode: drawMode, activeId: activeViewpointId, currentLine };
+            }, [drawMode, activeViewpointId, currentLine]);
+
+            useEffect(() => {
+                if (isDarkMode) document.documentElement.classList.add('dark');
+                else document.documentElement.classList.remove('dark');
+            }, [isDarkMode]);
+
+            const handleFolderSelect = async (event) => {
+                const selectedFiles = Array.from(event.target.files).filter(f => f.name.toLowerCase().endsWith('.gpx'));
+                if (selectedFiles.length === 0) return alert("Geen GPX bestanden gevonden in deze map.");
+
+                const parsedFiles = [];
+                for (let i = 0; i < selectedFiles.length; i++) {
+                    try { parsedFiles.push(await parseGPX(selectedFiles[i], i)); } 
+                    catch (e) { console.error("Fout bij parsen van GPX:", selectedFiles[i].name, e); }
+                }
+                parsedFiles.sort((a, b) => b.date - a.date);
+                setFiles(parsedFiles);
+                setSelectedPoint(null);
+            };
+
+            const handleTidalFolderSelect = async (event) => {
+                const selectedFiles = Array.from(event.target.files).filter(f => f.name.toLowerCase().endsWith('.xml'));
+                if (selectedFiles.length === 0) return alert("Geen XML getijdenbestanden gevonden in deze map.");
+
+                const parsedStations = [];
+                for (let i = 0; i < selectedFiles.length; i++) {
+                    try {
+                        const parsed = await parseTidalXML(selectedFiles[i]);
+                        if (parsed && parsed.rates.length > 0) parsedStations.push(parsed);
+                    } catch (e) { console.error("Fout bij parsen van XML:", selectedFiles[i].name, e); }
+                }
+                setTidalStations(parsedStations);
+            };
+
+            const toggleFileVisibility = (id) => setFiles(files.map(f => f.id === id ? { ...f, visible: !f.visible } : f));
+            const toggleAllVisibility = (visible) => setFiles(files.map(f => ({ ...f, visible })));
+
+            const handleExport = () => {
+                const dataStr = JSON.stringify({ files, tidalStations, viewpoints, appName }).replace(/</g, '\\u003c');
+                const scriptContent = document.querySelector('script[type="text/babel"]').textContent;
+                
+                const htmlContent = `<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${appName} (Export)</title>
+    <script src="https://cdn.tailwindcss.com"></scr` + `ipt>
+    <script>tailwind.config = { darkMode: 'class' }</scr` + `ipt>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></scr` + `ipt>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></scr` + `ipt>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></scr` + `ipt>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></scr` + `ipt>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></scr` + `ipt>
+    <style>
+        body { margin: 0; padding: 0; overflow: hidden; }
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .dark .custom-scroll::-webkit-scrollbar-track { background: #1e293b; }
+        .dark .custom-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        .dark .custom-scroll::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        .leaflet-container { outline: 0; background: #e5e7eb; }
+        .dark .leaflet-container { background: #0f172a; }
+        .dark .leaflet-bar a { background-color: #1e293b; color: #cbd5e1; border-color: #334155; }
+        .dark .leaflet-bar a:hover { background-color: #334155; color: #fff; }
+        .dark .leaflet-control-attribution { background: rgba(15, 23, 42, 0.7) !important; color: #94a3b8 !important; }
+        .dark .leaflet-control-attribution a { color: #38bdf8 !important; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 transition-colors duration-300 dark:bg-slate-900 dark:text-slate-100">
+    <div id="root"></div>
+    <script>
+        window.__INITIAL_DATA__ = ${dataStr};
+    </scr` + `ipt>
+    <script type="text/babel">
+${scriptContent}
+    </scr` + `ipt>
+</body>
+</html>`;
+
+                const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                const safeName = appName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                a.download = `${safeName}_Export_${new Date().toISOString().slice(0,10)}.html`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            };
+
+            // --- Saved Viewpoints Functionaliteit ---
+            const saveViewpoint = () => {
+                if (!mapInstance.current) return;
+                const bounds = mapInstance.current.getBounds();
+                const visibleIds = files.filter(f => f.visible).map(f => f.id);
+                const newVp = {
+                    id: Math.random().toString(36).substr(2, 9),
+                    name: `Viewpoint ${viewpoints.length + 1}`,
+                    bounds: [[bounds.getSouth(), bounds.getWest()], [bounds.getNorth(), bounds.getEast()]],
+                    visibleFiles: visibleIds,
+                    colorMode: colorMode,
+                    markups: { points: [], lines: [] }
+                };
+                setViewpoints([...viewpoints, newVp]);
+                setActiveViewpointId(newVp.id);
+                setDrawMode('none');
+                setCurrentLine([]);
+            };
+
+            const activateViewpoint = (vp) => {
+                setActiveViewpointId(vp.id);
+                setFiles(files.map(f => ({ ...f, visible: vp.visibleFiles.includes(f.id) })));
+                setColorMode(vp.colorMode || 'none');
+                setDrawMode('none');
+                setCurrentLine([]);
+                if (mapInstance.current && vp.bounds) {
+                    mapInstance.current.flyToBounds(vp.bounds, { duration: 0.5 });
+                }
+            };
+
+            const updateViewpointName = (id, newName) => {
+                setViewpoints(vps => vps.map(vp => vp.id === id ? { ...vp, name: newName } : vp));
+            };
+
+            const deleteViewpoint = (id) => {
+                setViewpoints(vps => vps.filter(vp => vp.id !== id));
+                if (activeViewpointId === id) {
+                    setActiveViewpointId(null);
+                    setDrawMode('none');
+                    setCurrentLine([]);
+                }
+            };
+
+            const finishLine = () => {
+                if (currentLine.length > 1 && activeViewpointId) {
+                    setViewpoints(vps => vps.map(vp => 
+                        vp.id === activeViewpointId 
+                        ? { ...vp, markups: { ...vp.markups, lines: [...(vp.markups?.lines || []), currentLine] } }
+                        : vp
+                    ));
+                }
+                setCurrentLine([]);
+                setDrawMode('none');
+            };
+
+            // Kaart Initialiseren (eenmalig)
+            useEffect(() => {
+                if (!mapInstance.current) {
+                    mapInstance.current = L.map(mapRef.current, {
+                        zoomControl: false
+                    }).setView([52.2, 5.5], 7);
+
+                    L.control.zoom({ position: 'bottomright' }).addTo(mapInstance.current);
+
+                    nauticalLayerRef.current = L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', {
+                        attribution: 'Nautische data: &copy; <a href="http://www.openseamap.org">OpenSeaMap</a>',
+                        maxZoom: 18
+                    });
+
+                    mapInstance.current.on('click', (e) => {
+                        const state = drawStateRef.current;
+                        
+                        // Handelen we een Markup tekening af?
+                        if (state.mode === 'point' && state.activeId) {
+                            setViewpoints(vps => vps.map(vp => 
+                                vp.id === state.activeId 
+                                ? { ...vp, markups: { ...vp.markups, points: [...(vp.markups?.points || []), {lat: e.latlng.lat, lon: e.latlng.lng}] } }
+                                : vp
+                            ));
+                            return; // Stop verdere klikafhandeling
+                        } else if (state.mode === 'line') {
+                            setCurrentLine(prev => [...prev, { lat: e.latlng.lat, lon: e.latlng.lng }]);
+                            return; // Stop verdere klikafhandeling
+                        }
+
+                        // Standaard: Zoek dichtstbijzijnde punt op route
+                        const latlng = e.latlng;
+                        let minDist = Infinity;
+                        let closest = null;
+
+                        filesRef.current.filter(f => f.visible).forEach(file => {
+                            file.points.forEach(p => {
+                                const dist = mapInstance.current.distance(latlng, [p.lat, p.lon]);
+                                if (dist < minDist) {
+                                    minDist = dist;
+                                    closest = { fileId: file.id, point: p, fileColor: file.color, fileName: file.name };
+                                }
+                            });
+                        });
+
+                        if (closest && minDist < 2000) setSelectedPoint(closest);
+                    });
+                }
+                return () => {
+                    if (mapInstance.current) {
+                        mapInstance.current.remove();
+                        mapInstance.current = null;
+                    }
+                };
+            }, []);
+
+            useEffect(() => {
+                if (!mapRef.current) return;
+                const resizeObserver = new ResizeObserver(() => {
+                    if (mapInstance.current) mapInstance.current.invalidateSize();
+                });
+                resizeObserver.observe(mapRef.current);
+                return () => resizeObserver.disconnect();
+            }, []);
+
+            useEffect(() => {
+                if (!mapInstance.current) return;
+
+                if (baseLayerRef.current) mapInstance.current.removeLayer(baseLayerRef.current);
+
+                const tileUrl = isDarkMode 
+                    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+                    : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+                baseLayerRef.current = L.tileLayer(tileUrl, {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+                    maxZoom: 18
+                });
+                
+                baseLayerRef.current.addTo(mapInstance.current);
+
+                if (nauticalLayerRef.current) {
+                    if (!mapInstance.current.hasLayer(nauticalLayerRef.current)) nauticalLayerRef.current.addTo(mapInstance.current);
+                    nauticalLayerRef.current.bringToFront();
+                }
+            }, [isDarkMode]);
+
+            // Markups Tekenen
+            useEffect(() => {
+                if (!mapInstance.current) return;
+                if (!markupLayerRef.current) {
+                    markupLayerRef.current = L.layerGroup().addTo(mapInstance.current);
+                }
+                const layer = markupLayerRef.current;
+                layer.clearLayers();
+
+                if (activeViewpointId) {
+                    const vp = viewpoints.find(v => v.id === activeViewpointId);
+                    if (vp && vp.markups) {
+                        (vp.markups.points || []).forEach(pt => {
+                            L.circleMarker([pt.lat, pt.lon], {
+                                radius: 5, color: '#ef4444', fillColor: '#ef4444', fillOpacity: 1, weight: 2
+                            }).addTo(layer);
+                        });
+                        (vp.markups.lines || []).forEach(line => {
+                            L.polyline(line.map(pt => [pt.lat, pt.lon]), {
+                                color: '#ef4444', weight: 4, opacity: 0.9, dashArray: '5, 8'
+                            }).addTo(layer);
+                        });
+                    }
+                }
+
+                if (currentLine.length > 0) {
+                    L.polyline(currentLine.map(pt => [pt.lat, pt.lon]), {
+                        color: '#ef4444', weight: 4, opacity: 0.9, dashArray: '5, 8'
+                    }).addTo(layer);
+                    
+                    currentLine.forEach(pt => {
+                        L.circleMarker([pt.lat, pt.lon], {
+                            radius: 4, color: '#ef4444', fillColor: '#ef4444', fillOpacity: 1
+                        }).addTo(layer);
+                    });
+                }
+            }, [viewpoints, activeViewpointId, currentLine]);
+
+            // Werk lijnen bij
+            useEffect(() => {
+                if (!mapInstance.current) return;
+                const bounds = L.latLngBounds();
+                let hasVisible = false;
+
+                files.forEach(file => {
+                    if (file.visible) {
+                        hasVisible = true;
+                        if (!polylinesRef.current[file.id]) polylinesRef.current[file.id] = L.layerGroup().addTo(mapInstance.current);
+                        
+                        const layerGroup = polylinesRef.current[file.id];
+                        layerGroup.clearLayers(); 
+                        
+                        if (colorMode === 'none') {
+                            const latlngs = file.points.map(p => [p.lat, p.lon]);
+                            const polyline = L.polyline(latlngs, { color: file.color, weight: 4, opacity: 0.8, lineCap: 'round', lineJoin: 'round' });
+                            polyline.addTo(layerGroup);
+                            bounds.extend(polyline.getBounds());
+                        } else {
+                            const vals = file.points.map(p => p[colorMode]);
+                            const min = Math.min(...vals);
+                            const max = Math.max(...vals);
+
+                            let currentSegment = [file.points[0]];
+                            let currentColor = interpolateColor(file.points[0][colorMode], min, max);
+
+                            for (let i = 1; i < file.points.length; i++) {
+                                const p = file.points[i];
+                                const c = interpolateColor(p[colorMode], min, max);
+                                currentSegment.push(p);
+
+                                if (c !== currentColor || i === file.points.length - 1) {
+                                    const segmentLine = L.polyline(currentSegment.map(pt => [pt.lat, pt.lon]), {
+                                        color: currentColor, weight: 5, opacity: 1, lineCap: 'round', lineJoin: 'round'
+                                    });
+                                    segmentLine.addTo(layerGroup);
+                                    bounds.extend(segmentLine.getBounds());
+                                    currentSegment = [p];
+                                    currentColor = c;
+                                }
+                            }
+                        }
+                    } else {
+                        if (polylinesRef.current[file.id]) {
+                            mapInstance.current.removeLayer(polylinesRef.current[file.id]);
+                            delete polylinesRef.current[file.id];
+                        }
+                    }
+                });
+
+                Object.keys(polylinesRef.current).forEach(id => {
+                    if (!files.find(f => f.id === id)) {
+                        mapInstance.current.removeLayer(polylinesRef.current[id]);
+                        delete polylinesRef.current[id];
+                    }
+                });
+
+                // Alleen inzoomen op bounds als we GEEN actief viewpoint hebben of net iets nieuws laden
+                if (hasVisible && files.length > 0 && Object.keys(polylinesRef.current).length === files.filter(f=>f.visible).length && !activeViewpointId) {
+                    try { mapInstance.current.fitBounds(bounds, { padding: [20, 20], maxZoom: 14 }); } catch(e) {}
+                }
+            }, [files, colorMode]);
+
+            // Marker
+            useEffect(() => {
+                if (!mapInstance.current) return;
+                if (selectedPoint) {
+                    if (markerRef.current) markerRef.current.remove();
+                    markerRef.current = L.circleMarker([selectedPoint.point.lat, selectedPoint.point.lon], {
+                        radius: 6, fillColor: isDarkMode ? '#fff' : '#0f172a', color: selectedPoint.fileColor, weight: 3, opacity: 1, fillOpacity: 1
+                    }).addTo(mapInstance.current);
+                } else if (markerRef.current) {
+                    markerRef.current.remove();
+                    markerRef.current = null;
+                }
+            }, [selectedPoint, isDarkMode]);
+
+            const activeTime = useMemo(() => {
+                if (selectedPoint?.point?.time) return selectedPoint.point.time;
+                const firstVisibleFile = files.find(f => f.visible);
+                return firstVisibleFile?.points[0]?.time || null;
+            }, [selectedPoint, files]);
+
+            const stationGpxSyncData = useMemo(() => {
+                const visibleFiles = files.filter(f => f.visible);
+                if (tidalSyncMode !== 'route' || visibleFiles.length === 0 || tidalStations.length === 0) return null;
+
+                const syncData = {};
+                tidalStations.forEach(station => {
+                    let minDist = Infinity;
+                    let closestTime = null;
+                    visibleFiles.forEach(file => {
+                        file.points.forEach(p => {
+                            if (!p.time) return;
+                            const dist = calculateDistance(station.lat, station.lon, p.lat, p.lon);
+                            if (dist < minDist) { minDist = dist; closestTime = p.time; }
+                        });
+                    });
+                    syncData[station.id] = { time: closestTime, dist: minDist };
+                });
+                return syncData;
+            }, [files, tidalStations, tidalSyncMode]);
+
+            // --- Gegevens berekenen voor linker paneel (Dichtstbijzijnde Stroom) ---
+            const selectedTide = useMemo(() => {
+                if (!selectedPoint || !selectedPoint.point.time || tidalStations.length === 0) return null;
+                let closestSt = null;
+                let minDist = Infinity;
+                tidalStations.forEach(st => {
+                    const d = calculateDistance(st.lat, st.lon, selectedPoint.point.lat, selectedPoint.point.lon);
+                    if (d < minDist) { minDist = d; closestSt = st; }
+                });
+                if (closestSt && minDist < 15) { 
+                    const rate = getClosestRate(closestSt.rates, selectedPoint.point.time.getTime());
+                    if (rate && Math.abs(rate.timeMs - selectedPoint.point.time.getTime()) < 48 * 3600000) {
+                        return { speed: rate.speed, bearing: rate.bearing, dist: minDist };
+                    }
+                }
+                return null;
+            }, [selectedPoint, tidalStations]);
+
+            // Werk Getijden Pijlen bij
+            useEffect(() => {
+                if (!mapInstance.current) return;
+                Object.values(tidalMarkersRef.current).forEach(m => m.remove());
+                tidalMarkersRef.current = {};
+
+                if (!showTidal || tidalStations.length === 0) return;
+                const isRouteMode = tidalSyncMode === 'route';
+                if (!isRouteMode && !activeTime) return;
+
+                tidalStations.forEach(station => {
+                    let targetTimeMs;
+                    if (isRouteMode) {
+                        const syncData = stationGpxSyncData && stationGpxSyncData[station.id];
+                        if (!syncData || !syncData.time) return;
+                        targetTimeMs = syncData.time.getTime();
+                    } else {
+                        targetTimeMs = activeTime.getTime();
+                    }
+
+                    const rate = getClosestRate(station.rates, targetTimeMs);
+                    if (!rate) return;
+
+                    const diffHours = Math.abs(rate.timeMs - targetTimeMs) / (1000 * 60 * 60);
+                    if (diffHours > 48) return;
+
+                    const speed = rate.speed;
+                    const bearing = rate.bearing;
+                    const size = Math.max(18, Math.min(60, 18 + speed * 15));
+                    const color = interpolateColor(speed, 0, 3);
+
+                    const timeDate = new Date(targetTimeMs);
+                    const timeString = `${timeDate.toLocaleDateString('nl-NL')} ${timeDate.toLocaleTimeString('nl-NL')}`;
+
+                    const iconHtml = `
+                        <div style="position: relative; width: ${size}px; height: ${size}px; z-index: 500;">
+                            <div style="width: 100%; height: 100%; transform: rotate(${bearing}deg); transform-origin: center;">
+                                <svg viewBox="0 0 24 24" style="width: 100%; height: 100%; overflow: visible;" fill="${color}" stroke="#ffffff" stroke-width="1.5">
+                                    <path d="M12 0L4 10h5v12h6V10h5z" style="filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.5));"/>
+                                </svg>
+                            </div>
+                            <div style="position: absolute; left: 50%; top: ${size + 2}px; transform: translateX(-50%); font-size: 10px; font-weight: bold; color: #fff; text-shadow: 1px 1px 2px #000, -1px -1px 2px #000; pointer-events: none; white-space: nowrap;">
+                                ${speed.toFixed(1)} kts
+                            </div>
+                        </div>
+                    `;
+
+                    const icon = L.divIcon({ html: iconHtml, className: '', iconSize: [size, size], iconAnchor: [size/2, size/2] });
+                    const marker = L.marker([station.lat, station.lon], { icon }).addTo(mapInstance.current);
+                    
+                    marker.bindTooltip(`
+                        <div class="text-xs">
+                            <b class="text-sm block border-b border-slate-300 pb-1 mb-1">${station.id} (Stroom)</b>
+                            <span class="text-slate-500">Stroomsnelheid:</span> <span class="font-mono font-bold">${speed.toFixed(2)} kts</span><br/>
+                            <span class="text-slate-500">Richting:</span> <span class="font-mono font-bold">${bearing.toFixed(0)}°</span>
+                            ${isRouteMode ? `<br/><span class="text-slate-400 text-[10px] block mt-1 pt-1 border-t border-slate-200 dark:border-slate-700">Tijdstip passage: ${timeString}</span>` : ''}
+                        </div>
+                    `, {direction: 'top', offset: [0, -size/2], className: 'bg-white/95 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border-none shadow-md rounded'});
+
+                    tidalMarkersRef.current[station.id] = marker;
+                });
+            }, [activeTime, tidalStations, showTidal, tidalSyncMode, stationGpxSyncData]);
+
+            // Groeperen & sorteren voor bestandenlijst
+            const displayedFilesForName = useMemo(() => {
+                let list = [...files];
+                if (sortAlpha) {
+                    list.sort((a, b) => a.name.localeCompare(b.name));
+                } else {
+                    list.sort((a, b) => b.date - a.date);
+                }
+                return list;
+            }, [files, sortAlpha]);
+
+            const groupedFilesByDate = useMemo(() => {
+                const groups = {};
+                files.forEach(file => {
+                    const dateStr = file.date.toISOString().split('T')[0];
+                    if (!groups[dateStr]) groups[dateStr] = [];
+                    groups[dateStr].push(file);
+                });
+                return Object.keys(groups).sort((a, b) => new Date(b) - new Date(a)).map(date => ({ date, files: groups[date] }));
+            }, [files]);
+            
+            const summaryStats = useMemo(() => {
+                const visibleFiles = files.filter(f => f.visible);
+                if (visibleFiles.length === 0) return null;
+                let totalDist = 0, maxSpeed = 0, totalTime = 0, totalEle = 0;
+                visibleFiles.forEach(f => {
+                    totalDist += f.stats.totalDistNM;
+                    if (f.stats.maxSpeedKts > maxSpeed) maxSpeed = f.stats.maxSpeedKts;
+                    totalTime += f.stats.totalTimeMin;
+                    totalEle += f.stats.totalEleGain;
+                });
+                const avgSpeed = totalTime > 0 ? totalDist / (totalTime / 60) : 0;
+                return { totalDist, maxSpeed, avgSpeed, totalTime, totalEle, fileCount: visibleFiles.length };
+            }, [files]);
+
+            const formatDuration = (totalMins) => {
+                if (!totalMins) return "0u 0m";
+                const h = Math.floor(totalMins / 60);
+                const m = Math.floor(totalMins % 60);
+                return `${h}u ${m}m`;
+            };
+
+            return (
+                <div className="flex flex-col md:flex-row h-screen w-full font-sans transition-colors duration-300">
+                    <div className={`bg-white border-r border-slate-200 dark:bg-slate-800 dark:border-slate-700 flex flex-col z-20 shrink-0 transition-all duration-300 overflow-hidden ${isSidebarOpen ? 'w-full md:w-80' : 'w-0 border-none'}`}>
+                        <div className="w-full md:w-80 flex flex-col h-full shrink-0">
+                            <div className="p-4 border-b border-slate-200 dark:border-slate-700 overflow-y-auto custom-scroll max-h-[50vh]">
+                                <div className="flex items-center justify-between mb-4 shrink-0">
+                                    <div className="flex items-center gap-2 flex-1 mr-2 overflow-hidden">
+                                        <Icons.Folder /> 
+                                        <input 
+                                            value={appName} 
+                                            onChange={(e) => setAppName(e.target.value)} 
+                                            className="text-xl font-bold bg-transparent outline-none w-full border-b border-transparent hover:border-slate-300 dark:hover:border-slate-600 focus:border-sky-500 transition-colors truncate"
+                                            title="Naam van de tool (aanpasbaar)"
+                                        />
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 dark:text-slate-300 transition-colors" title="Wissel Thema">
+                                            {isDarkMode ? <Icons.Sun /> : <Icons.Moon />}
+                                        </button>
+                                        <button onClick={() => setIsSidebarOpen(false)} className="p-2 rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 dark:text-slate-300 transition-colors hidden md:block" title="Verberg Menu">
+                                            <Icons.PanelLeftClose />
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex flex-col gap-2 shrink-0">
+                                    <label className="flex items-center justify-center w-full bg-sky-600 hover:bg-sky-500 text-white font-medium py-2 px-4 rounded cursor-pointer transition-colors shadow-sm">
+                                        <span className="truncate">1. Selecteer GPX Map</span>
+                                        <input type="file" webkitdirectory="true" directory="true" multiple className="hidden" onChange={handleFolderSelect} />
+                                    </label>
+
+                                    <label className="flex items-center justify-center w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 px-4 rounded cursor-pointer transition-colors shadow-sm">
+                                        <span className="truncate">2. Selecteer Getijden Map (XML)</span>
+                                        <input type="file" webkitdirectory="true" directory="true" multiple className="hidden" onChange={handleTidalFolderSelect} />
+                                    </label>
+                                </div>
+                                
+                                {(files.length > 0 || tidalStations.length > 0 || viewpoints.length > 0) && (
+                                    <button onClick={handleExport} className="flex items-center justify-center gap-2 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 px-4 rounded transition-colors shadow-sm mt-3 shrink-0" title="Exporteer alles naar één los HTML bestand">
+                                        <Icons.Download /> <span className="truncate">Exporteer HTML</span>
+                                    </button>
+                                )}
+
+                                {tidalStations.length > 0 && (
+                                    <div className="flex flex-col gap-2 mt-4 text-xs text-slate-500 dark:text-slate-400 border-t border-slate-200 dark:border-slate-700 pt-3 shrink-0">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className="flex items-center gap-1 font-semibold text-indigo-600 dark:text-indigo-400"><Icons.Waves /> {tidalStations.length} Stroomstations</span>
+                                            <div className="flex items-center gap-3">
+                                                <button onClick={() => setTidalSyncMode(m => m === 'time' ? 'route' : 'time')} className={`flex items-center gap-1 transition-colors ${tidalSyncMode === 'route' ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-slate-400 hover:text-slate-500'}`} title="Toon per station de stroomsituatie op het moment dat je er langskwam.">
+                                                    <Icons.MapPin width={12} height={12} /> GPX Sync
+                                                </button>
+                                                <button onClick={() => setShowTidal(!showTidal)} className={`transition-colors ${showTidal ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 hover:text-slate-500'}`}>
+                                                    {showTidal ? 'Verberg' : 'Toon'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        {showTidal && tidalSyncMode === 'time' && activeTime && (
+                                            <div className="text-[10px] bg-slate-100 dark:bg-slate-900/50 p-1.5 rounded border border-slate-200 dark:border-slate-700 text-center flex flex-col">
+                                                <span className="text-slate-500 dark:text-slate-400 mb-0.5">Toont data op moment van selectie:</span>
+                                                <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">
+                                                    {activeTime.toLocaleDateString('nl-NL')} {activeTime.toLocaleTimeString('nl-NL')}
+                                                </span>
+                                            </div>
+                                        )}
+                                        {showTidal && tidalSyncMode === 'route' && (
+                                            <div className="text-[10px] bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 p-1.5 rounded border border-emerald-200 dark:border-emerald-800 text-center flex flex-col">
+                                                <span className="font-medium">GPX Sync is actief</span>
+                                                <span>Pijlen tonen de stroomsituatie ten tijde van passage per station.</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex flex-col flex-grow overflow-hidden">
+                                <div className="p-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 transition-colors duration-300 shrink-0">
+                                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 block uppercase tracking-wider">Route Kleur:</span>
+                                    <div className="flex bg-slate-200 dark:bg-slate-900 rounded p-1">
+                                        <button onClick={() => setColorMode('none')} className={`flex-1 text-xs py-1 rounded transition-colors ${colorMode === 'none' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
+                                            Bestand
+                                        </button>
+                                        <button onClick={() => setColorMode('speedKts')} className={`flex-1 text-xs py-1 rounded transition-colors ${colorMode === 'speedKts' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
+                                            Snelheid
+                                        </button>
+                                        <button onClick={() => setColorMode('ele')} className={`flex-1 text-xs py-1 rounded transition-colors ${colorMode === 'ele' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}>
+                                            Hoogte
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="flex border-b border-slate-200 dark:border-slate-700 p-2 gap-1 bg-slate-50 dark:bg-slate-800 transition-colors duration-300 shrink-0">
+                                    <button onClick={() => setViewMode('filename')} className={`flex-1 flex flex-col items-center justify-center py-1.5 rounded text-xs font-medium transition-colors ${viewMode === 'filename' ? 'bg-slate-200 text-slate-900 dark:bg-slate-700 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}>
+                                        <Icons.List /> <span>Naam</span>
+                                    </button>
+                                    <button onClick={() => setViewMode('date')} className={`flex-1 flex flex-col items-center justify-center py-1.5 rounded text-xs font-medium transition-colors ${viewMode === 'date' ? 'bg-slate-200 text-slate-900 dark:bg-slate-700 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}>
+                                        <Icons.Calendar /> <span>Datum</span>
+                                    </button>
+                                    <button onClick={() => setViewMode('viewpoints')} className={`flex-1 flex flex-col items-center justify-center py-1.5 rounded text-xs font-medium transition-colors ${viewMode === 'viewpoints' ? 'bg-slate-200 text-slate-900 dark:bg-slate-700 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}>
+                                        <Icons.Bookmark /> <span>Viewpoints</span>
+                                    </button>
+                                </div>
+
+                                {(viewMode === 'filename' || viewMode === 'date') && (
+                                    <div className="p-2 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center shrink-0">
+                                        <div className="flex gap-2">
+                                            <button onClick={() => toggleAllVisibility(true)} className="text-xs font-medium text-sky-600 hover:text-sky-500 dark:text-sky-400 dark:hover:text-sky-300">Toon Alles</button>
+                                            <span className="text-slate-300 dark:text-slate-600">|</span>
+                                            <button onClick={() => toggleAllVisibility(false)} className="text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300">Verberg Alles</button>
+                                        </div>
+                                        {viewMode === 'filename' && (
+                                            <button onClick={() => setSortAlpha(!sortAlpha)} className="text-[10px] uppercase font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
+                                                {sortAlpha ? 'Sorteer Datum' : 'Sorteer A-Z'}
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+
+                                <div className="flex-grow overflow-y-auto custom-scroll p-2">
+                                    {viewMode === 'filename' && (
+                                        <div className="flex flex-col gap-1">
+                                            {displayedFilesForName.map(file => (
+                                                <FileItem key={file.id} file={file} onToggle={() => toggleFileVisibility(file.id)} isDarkMode={isDarkMode} />
+                                            ))}
+                                            {files.length === 0 && <p className="text-sm text-slate-500 text-center mt-4">Geen GPX bestanden geladen.</p>}
+                                        </div>
+                                    )}
+                                    
+                                    {viewMode === 'date' && (
+                                        <div className="flex flex-col gap-4 mt-2">
+                                            {groupedFilesByDate.map(group => (
+                                                <div key={group.date}>
+                                                    <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-2">
+                                                        {new Date(group.date).toLocaleDateString('nl-NL', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                                                    </h3>
+                                                    <div className="flex flex-col gap-1">
+                                                        {group.files.map(file => (
+                                                            <FileItem key={file.id} file={file} onToggle={() => toggleFileVisibility(file.id)} isDarkMode={isDarkMode} />
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {files.length === 0 && <p className="text-sm text-slate-500 text-center mt-4">Geen GPX bestanden geladen.</p>}
+                                        </div>
+                                    )}
+
+                                    {viewMode === 'viewpoints' && (
+                                        <div className="flex flex-col gap-3">
+                                            <button 
+                                                onClick={saveViewpoint} 
+                                                className="w-full bg-sky-100 text-sky-700 hover:bg-sky-200 dark:bg-sky-900/30 dark:text-sky-400 dark:hover:bg-sky-900/50 py-2 rounded text-sm font-semibold transition-colors border border-sky-200 dark:border-sky-800 flex items-center justify-center gap-2"
+                                            >
+                                                <Icons.Bookmark /> Nieuw Viewpoint Opslaan
+                                            </button>
+                                            
+                                            {viewpoints.length === 0 ? (
+                                                <p className="text-xs text-slate-500 text-center mt-2 px-4">
+                                                    Sla je huidige weergave, geselecteerde routes en markups op.
+                                                </p>
+                                            ) : (
+                                                <div className="flex flex-col gap-2 mt-2">
+                                                    {viewpoints.map(vp => (
+                                                        <div key={vp.id} className={`p-2 rounded border flex flex-col gap-2 transition-colors ${activeViewpointId === vp.id ? 'bg-sky-50 border-sky-300 dark:bg-sky-900/20 dark:border-sky-700' : 'bg-white border-slate-200 hover:bg-slate-50 dark:bg-slate-800/50 dark:border-slate-700 dark:hover:bg-slate-700/50'}`}>
+                                                            <div className="flex items-center justify-between gap-2">
+                                                                <input 
+                                                                    value={vp.name} 
+                                                                    onChange={(e) => updateViewpointName(vp.id, e.target.value)} 
+                                                                    className="bg-transparent font-semibold text-sm w-full outline-none focus:border-b focus:border-slate-400 dark:text-slate-200"
+                                                                />
+                                                                <div className="flex items-center gap-1">
+                                                                    <button onClick={() => activateViewpoint(vp)} className={`text-xs px-2 py-1 rounded transition-colors ${activeViewpointId === vp.id ? 'bg-sky-600 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600'}`}>
+                                                                        {activeViewpointId === vp.id ? 'Actief' : 'Toon'}
+                                                                    </button>
+                                                                    <button onClick={() => deleteViewpoint(vp.id)} className="p-1 text-slate-400 hover:text-red-500 transition-colors" title="Verwijder">
+                                                                        <Icons.Trash />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                            
+                                                            {/* Teken tools verschijnen alleen bij het actieve viewpoint */}
+                                                            {activeViewpointId === vp.id && (
+                                                                <div className="mt-1 pt-2 border-t border-slate-200 dark:border-slate-700 flex flex-col gap-2">
+                                                                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Voeg Markups Toe:</span>
+                                                                    <div className="flex gap-2">
+                                                                        <button 
+                                                                            onClick={() => { setDrawMode(drawMode === 'point' ? 'none' : 'point'); setCurrentLine([]); }}
+                                                                            className={`flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors flex-1 justify-center ${drawMode === 'point' ? 'bg-red-100 border-red-500 text-red-700 dark:bg-red-900/30 dark:border-red-500/50 dark:text-red-400' : 'bg-white border-slate-200 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-600 dark:hover:bg-slate-700 dark:text-slate-300'}`}
+                                                                        >
+                                                                            <Icons.MapPin width={12} height={12} /> Punt
+                                                                        </button>
+                                                                        <button 
+                                                                            onClick={() => { setDrawMode(drawMode === 'line' ? 'none' : 'line'); setCurrentLine([]); }}
+                                                                            className={`flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors flex-1 justify-center ${drawMode === 'line' ? 'bg-red-100 border-red-500 text-red-700 dark:bg-red-900/30 dark:border-red-500/50 dark:text-red-400' : 'bg-white border-slate-200 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-600 dark:hover:bg-slate-700 dark:text-slate-300'}`}
+                                                                        >
+                                                                            <Icons.PenTool /> Lijn
+                                                                        </button>
+                                                                    </div>
+                                                                    
+                                                                    {drawMode !== 'none' && (
+                                                                        <div className="text-[10px] text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/10 p-1.5 rounded flex flex-col gap-1 items-center text-center">
+                                                                            <span>Klik op de kaart om te tekenen.</span>
+                                                                            {drawMode === 'line' && currentLine.length > 0 && (
+                                                                                <button onClick={finishLine} className="bg-red-500 text-white px-2 py-1 rounded w-full mt-1 font-semibold hover:bg-red-600">
+                                                                                    Stop en Sla Lijn Op
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 flex flex-col relative h-full overflow-hidden bg-slate-100 dark:bg-slate-900 transition-colors duration-300">
+                        {!isSidebarOpen && (
+                            <button onClick={() => setIsSidebarOpen(true)} className="absolute top-4 left-4 z-[400] bg-white/90 dark:bg-slate-800/90 backdrop-blur p-2.5 rounded shadow-md border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all" title="Open Menu">
+                                <Icons.Menu />
+                            </button>
+                        )}
+
+                        <div className="flex-1 w-full relative z-0 min-h-[30vh] transition-all duration-300" ref={mapRef}></div>
+
+                        {/* Data Paneeltje (Linksboven) - Zonder wind, enkel details en stroom */}
+                        {selectedPoint && drawMode === 'none' && (
+                            <div className={`absolute ${!isSidebarOpen ? 'top-16' : 'top-4'} left-4 z-[400] bg-white/95 dark:bg-slate-900/95 backdrop-blur border border-slate-200 dark:border-slate-700 p-4 rounded-xl shadow-xl w-64 max-h-[80vh] overflow-y-auto custom-scroll transition-all duration-300`}>
+                                <div className="flex items-center gap-2 mb-2 pr-6 border-b border-slate-100 dark:border-slate-800 pb-2 relative">
+                                    <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: selectedPoint.fileColor }}></div>
+                                    <span className="font-semibold text-slate-800 dark:text-white truncate text-sm">{selectedPoint.fileName}</span>
+                                    
+                                    <button 
+                                        onClick={() => setSelectedPoint(null)}
+                                        className="absolute right-0 top-0 text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors"
+                                        title="Sluit paneel"
+                                    >
+                                        <Icons.Close />
+                                    </button>
+                                </div>
+                                <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-sm items-center">
+                                    <div className="text-slate-500 dark:text-slate-400">Afstand</div>
+                                    <div className="text-right text-slate-900 dark:text-white font-mono leading-tight">
+                                        {selectedPoint.point.totalDistNM.toFixed(2)} NM<br/>
+                                        <span className="text-[11px] text-slate-500 dark:text-slate-400">{selectedPoint.point.totalDist.toFixed(2)} km</span>
+                                    </div>
+                                    
+                                    <div className="text-slate-500 dark:text-slate-400">Hoogte</div>
+                                    <div className="text-right text-slate-900 dark:text-white font-mono leading-tight">{selectedPoint.point.ele.toFixed(0)} m</div>
+                                    
+                                    <div className="text-slate-500 dark:text-slate-400">Boot Snelheid</div>
+                                    <div className="text-right text-slate-900 dark:text-white font-mono leading-tight">
+                                        {selectedPoint.point.speedKts.toFixed(1)} kts<br/>
+                                        <span className="text-[11px] text-slate-500 dark:text-slate-400">{selectedPoint.point.speed.toFixed(1)} km/u</span>
+                                    </div>
+                                    
+                                    {selectedTide && (
+                                        <>
+                                            <div className="text-slate-500 dark:text-slate-400">Stroom</div>
+                                            <div className="text-right text-indigo-600 dark:text-indigo-400 font-mono leading-tight">
+                                                {selectedTide.speed.toFixed(1)} kts<br/>
+                                                <span className="text-[11px] text-slate-500 dark:text-slate-400">{selectedTide.bearing.toFixed(0)}°</span>
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {selectedPoint.point.hr && (
+                                        <>
+                                            <div className="text-slate-500 dark:text-slate-400">Hartslag</div>
+                                            <div className="text-right text-red-500 dark:text-red-400 font-mono leading-tight">{selectedPoint.point.hr} bpm</div>
+                                        </>
+                                    )}
+                                    {selectedPoint.point.time && (
+                                        <>
+                                            <div className="text-slate-500 dark:text-slate-400">Tijdstip</div>
+                                            <div className="text-right text-slate-900 dark:text-white font-mono text-xs leading-tight">
+                                                {selectedPoint.point.time.toLocaleDateString('nl-NL')}<br/>
+                                                <span className="text-[11px]">{selectedPoint.point.time.toLocaleTimeString('nl-NL')}</span>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="shrink-0 max-h-[60vh] overflow-y-auto custom-scroll bg-slate-50 dark:bg-slate-900 p-4 border-t border-slate-200 dark:border-slate-700 z-10 transition-all duration-300 ease-in-out">
+                            {files.filter(f => f.visible).length > 0 ? (
+                                <div className="max-w-6xl mx-auto flex flex-col gap-5">
+                                    
+                                    {/* Overzichtstegel (Verplaatst uit de zijbalk) */}
+                                    {summaryStats && (
+                                        <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-4 shadow-sm">
+                                            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 border-b border-slate-100 dark:border-slate-700 pb-2">
+                                                Overzicht Geselecteerde Routes ({summaryStats.fileCount})
+                                            </h3>
+                                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] uppercase font-bold text-slate-400">Totale Afstand</span>
+                                                    <span className="font-mono text-lg font-semibold text-slate-800 dark:text-slate-100">{summaryStats.totalDist.toFixed(2)} NM</span>
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] uppercase font-bold text-slate-400">Totale Tijd</span>
+                                                    <span className="font-mono text-lg font-semibold text-slate-800 dark:text-slate-100">{formatDuration(summaryStats.totalTime)}</span>
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] uppercase font-bold text-slate-400">Stijging</span>
+                                                    <span className="font-mono text-lg font-semibold text-slate-800 dark:text-slate-100">+{summaryStats.totalEle.toFixed(0)} m</span>
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] uppercase font-bold text-slate-400">Max Snelheid</span>
+                                                    <span className="font-mono text-lg font-semibold text-slate-800 dark:text-slate-100">{summaryStats.maxSpeed.toFixed(1)} kts</span>
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] uppercase font-bold text-slate-400">Gemiddelde Snelheid</span>
+                                                    <span className="font-mono text-lg font-semibold text-slate-800 dark:text-slate-100">{summaryStats.avgSpeed.toFixed(1)} kts</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <GpxChart 
+                                        title="Snelheid" 
+                                        dataKey="speedKts" 
+                                        yAxisLabel="Snelheid (kts)" 
+                                        files={files} 
+                                        selectedPoint={selectedPoint} 
+                                        onPointHover={setSelectedPoint} 
+                                        isDarkMode={isDarkMode} 
+                                    />
+                                    {/* Grafiek Assen omgedraaid: Tijd op X-as, Afstand op Y-as */}
+                                    <GpxChart 
+                                        title="Afstand over Tijd" 
+                                        dataKey="totalDistNM" 
+                                        xAxisKey="elapsedTime"
+                                        yAxisLabel="Afstand (NM)" 
+                                        xAxisLabel="Verstreken Tijd (min)"
+                                        files={files} 
+                                        selectedPoint={selectedPoint} 
+                                        onPointHover={setSelectedPoint} 
+                                        isDarkMode={isDarkMode} 
+                                    />
+                                    <GpxChart 
+                                        title="Hartslag" 
+                                        dataKey="hr" 
+                                        yAxisLabel="Hartslag (bpm)" 
+                                        files={files} 
+                                        selectedPoint={selectedPoint} 
+                                        onPointHover={setSelectedPoint} 
+                                        isDarkMode={isDarkMode} 
+                                    />
+                                </div>
+                            ) : (
+                                <div className="flex items-center justify-center py-4 text-slate-500">
+                                    {files.length > 0 ? "Maak bestanden zichtbaar om grafieken te bekijken." : "Grafieken en overzichten verschijnen hier zodra je bestanden inlaadt."}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const FileItem = ({ file, onToggle, isDarkMode }) => (
+            <div className="flex items-center justify-between p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700/50 cursor-pointer group transition-colors" onClick={onToggle}>
+                <div className="flex items-center gap-3 overflow-hidden">
+                    <div className={`w-3 h-3 rounded-full shrink-0 transition-opacity ${file.visible ? 'opacity-100' : 'opacity-30'}`} style={{ backgroundColor: file.color }}></div>
+                    <div className="flex flex-col overflow-hidden">
+                        <span className={`text-sm truncate transition-colors ${file.visible ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500'}`} title={file.name}>{file.name}</span>
+                        <span className="text-[10px] text-slate-500 dark:text-slate-500 truncate">{file.filename} • {(file.stats.totalDistNM).toFixed(2)} NM</span>
+                    </div>
+                </div>
+                <button className={`text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white shrink-0 p-1 transition-colors ${file.visible ? 'text-sky-500 dark:text-sky-400' : ''}`}>
+                    {file.visible ? <Icons.Eye /> : <Icons.EyeOff />}
+                </button>
+            </div>
+        );
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

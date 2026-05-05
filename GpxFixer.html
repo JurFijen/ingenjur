@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPX Analysator & Editor</title>
+    
+    <!-- Tailwind CSS voor styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet CSS voor de interactieve kaart -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <style>
+        /* Aangepaste scrollbar voor de sidebar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        #map { z-index: 10; }
+        .legend {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            line-height: 1.5;
+            color: #333;
+            font-size: 12px;
+        }
+        .color-scale {
+            width: 100%;
+            height: 10px;
+            background: linear-gradient(to right, hsl(240, 100%, 50%), hsl(180, 100%, 50%), hsl(120, 100%, 50%), hsl(60, 100%, 50%), hsl(0, 100%, 50%));
+            border-radius: 5px;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 h-screen flex flex-col font-sans overflow-hidden">
+
+    <!-- Top Navigatie -->
+    <header class="bg-slate-800 text-white p-4 flex justify-between items-center shadow-md z-20 relative">
+        <div class="flex items-center space-x-4">
+            <h1 class="text-xl font-bold flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-400"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                GPX Checker & Editor
+            </h1>
+            <div class="h-6 w-px bg-slate-600 mx-2"></div>
+            <div>
+                <label class="bg-blue-600 hover:bg-blue-700 cursor-pointer px-4 py-2 rounded-md text-sm font-medium transition-colors inline-flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+                    Bestanden Inladen
+                    <input type="file" id="fileInput" multiple accept=".gpx" class="hidden" onchange="handleFiles(event)">
+                </label>
+            </div>
+        </div>
+        
+        <div class="flex items-center gap-4 text-sm">
+            <div class="flex items-center gap-2 bg-slate-700 px-3 py-1.5 rounded">
+                <label for="speedThreshold" class="text-slate-300">Max snelheid (foutdetectie):</label>
+                <input type="number" id="speedThreshold" value="45" class="w-16 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-white text-center focus:outline-none focus:border-blue-500" onchange="recalculateCurrent()">
+                <span class="text-slate-400">km/h</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex overflow-hidden">
+        
+        <!-- Sidebar -->
+        <aside class="w-96 bg-white border-r border-slate-200 flex flex-col h-full z-20 shadow-[4px_0_10px_rgba(0,0,0,0.05)]">
+            
+            <!-- Bestanden Lijst -->
+            <div class="p-4 border-b border-slate-200">
+                <h2 class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">Geladen Bestanden</h2>
+                <div id="fileList" class="space-y-2 max-h-40 overflow-y-auto">
+                    <div class="text-sm text-slate-400 italic" id="noFilesMsg">Geen bestanden ingeladen.</div>
+                </div>
+            </div>
+
+            <!-- Fouten Lijst -->
+            <div class="flex-1 overflow-y-auto p-4 flex flex-col">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Gevonden Fouten</h2>
+                    <span id="errorCount" class="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded-full">0</span>
+                </div>
+                
+                <div id="errorList" class="space-y-3 flex-1">
+                    <div class="text-sm text-slate-400 italic text-center mt-10">Laad een bestand in om data te analyseren.</div>
+                </div>
+
+                <!-- Export Knop (onderaan sidebar) -->
+                <div class="mt-4 pt-4 border-t border-slate-200 hidden" id="exportContainer">
+                    <button onclick="exportCurrentTrack()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 px-4 rounded-md shadow-sm transition-colors flex items-center justify-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                        Exporteer Opgeschoonde GPX
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Kaart Gebied -->
+        <div class="flex-1 relative bg-slate-200" id="mapContainer">
+            <div id="map" class="absolute inset-0"></div>
+            
+            <!-- Loading Overlay -->
+            <div id="loading" class="hidden absolute inset-0 bg-slate-900/50 z-[1000] flex items-center justify-center text-white flex-col gap-4 backdrop-blur-sm">
+                <svg class="animate-spin h-10 w-10 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <div class="font-medium text-lg">Bezig met analyseren...</div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <script>
+        // -- Globale Status --
+        let tracksData = [];
+        let activeTrackIndex = -1;
+        let map;
+        let trackLayerGroup;
+        let errorMarkerLayer;
+        let legendControl;
+
+        // -- Initialisatie Map --
+        function initMap() {
+            // Startpositie Nederland
+            map = L.map('map').setView([52.1, 5.2], 8);
+
+            // Voeg een donkere/satelliet achtige kaart toe (Esri World Imagery) - vergelijkbaar met de screenshot
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+                maxZoom: 18
+            }).addTo(map);
+
+            trackLayerGroup = L.featureGroup().addTo(map);
+            errorMarkerLayer = L.featureGroup().addTo(map);
+
+            // Voeg de Garmin stijl legenda toe
+            const Legend = L.Control.extend({
+                options: { position: 'topright' },
+                onAdd: function (map) {
+                    const div = L.DomUtil.create('div', 'legend');
+                    div.innerHTML = `
+                        <div style="font-weight:bold; margin-bottom: 5px;">Snelheid</div>
+                        <div class="color-scale"></div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span id="leg-min">0 km/h</span>
+                            <span id="leg-max">Max</span>
+                        </div>
+                    `;
+                    return div;
+                }
+            });
+            legendControl = new Legend();
+            map.addControl(legendControl);
+        }
+
+        // Run map init on load
+        window.onload = initMap;
+
+        // -- Bestandsverwerking --
+        async function handleFiles(event) {
+            const files = event.target.files;
+            if (!files.length) return;
+
+            showLoading(true);
+            
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                await processGPXFile(file);
+            }
+
+            renderFileList();
+            if (tracksData.length > 0 && activeTrackIndex === -1) {
+                selectTrack(0);
+            }
+            
+            showLoading(false);
+            // Reset input so the same files can be selected again if needed
+            event.target.value = '';
+        }
+
+        function processGPXFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const text = e.target.result;
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(text, "text/xml");
+                    
+                    const trkptsNodes = xmlDoc.getElementsByTagName("trkpt");
+                    let points = [];
+                    
+                    for(let i = 0; i < trkptsNodes.length; i++) {
+                        const node = trkptsNodes[i];
+                        const lat = parseFloat(node.getAttribute("lat"));
+                        const lon = parseFloat(node.getAttribute("lon"));
+                        
+                        const eleNode = node.getElementsByTagName("ele")[0];
+                        const ele = eleNode ? parseFloat(eleNode.textContent) : 0;
+                        
+                        const timeNode = node.getElementsByTagName("time")[0];
+                        const time = timeNode ? new Date(timeNode.textContent) : null;
+
+                        points.push({
+                            id: i,
+                            lat, lon, ele, time,
+                            originalNode: node,
+                            deleted: false,
+                            speed: 0,
+                            distance: 0,
+                            timeDiff: 0
+                        });
+                    }
+
+                    const track = {
+                        filename: file.name,
+                        originalDoc: xmlDoc,
+                        points: points,
+                        errors: []
+                    };
+
+                    calculateTrackData(track);
+                    tracksData.push(track);
+                    resolve();
+                };
+                reader.onerror = reject;
+                reader.readAsText(file);
+            });
+        }
+
+        // -- Wiskunde & Analyse --
+        // Haversine formule voor afstand in meters
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3;
+            const p1 = lat1 * Math.PI/180;
+            const p2 = lat2 * Math.PI/180;
+            const dp = (lat2-lat1) * Math.PI/180;
+            const dl = (lon2-lon1) * Math.PI/180;
+            const a = Math.sin(dp/2) * Math.sin(dp/2) +
+                      Math.cos(p1) * Math.cos(p2) *
+                      Math.sin(dl/2) * Math.sin(dl/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        function calculateTrackData(track) {
+            let validPoints = track.points.filter(p => !p.deleted);
+            track.errors = [];
+            const threshold = parseFloat(document.getElementById('speedThreshold').value);
+
+            for (let i = 1; i < validPoints.length; i++) {
+                const p1 = validPoints[i-1];
+                const p2 = validPoints[i];
+
+                const distMeters = getDistance(p1.lat, p1.lon, p2.lat, p2.lon);
+                p2.distance = distMeters;
+
+                if (p1.time && p2.time) {
+                    const timeSeconds = (p2.time.getTime() - p1.time.getTime()) / 1000;
+                    p2.timeDiff = timeSeconds;
+                    
+                    if (timeSeconds > 0) {
+                        const speedMs = distMeters / timeSeconds;
+                        const speedKmh = speedMs * 3.6;
+                        p2.speed = speedKmh;
+
+                        // Foutdetectie algoritme
+                        if (speedKmh > threshold) {
+                            track.errors.push({
+                                point: p2,
+                                reason: 'Onrealistische snelheidspiek',
+                                value: speedKmh,
+                                unit: 'km/h',
+                                ignored: false
+                            });
+                        }
+                    } else {
+                        p2.speed = 0;
+                        if(distMeters > 50) {
+                            track.errors.push({
+                                point: p2,
+                                reason: 'Teleportatie (grote afstand, 0 sec)',
+                                value: distMeters,
+                                unit: 'm',
+                                ignored: false
+                            });
+                        }
+                    }
+                } else {
+                    p2.speed = 0; // Geen tijd data
+                }
+            }
+        }
+
+        // -- Kleuren Algoritme (Garmin Stijl) --
+        function speedToColor(speed, minSpeed, maxSpeed) {
+            if (speed == null || maxSpeed === minSpeed) return 'hsl(240, 100%, 50%)'; // Blauw als standaard
+            
+            // Beperk de snelheid binnen de min/max (clamp)
+            let clampedSpeed = Math.max(minSpeed, Math.min(maxSpeed, speed));
+            
+            // Bereken verhouding (0.0 tot 1.0)
+            let ratio = (clampedSpeed - minSpeed) / (maxSpeed - minSpeed);
+            
+            // HSL Hue: 240 is Blauw, 180 Cyaan, 120 Groen, 60 Geel, 0 is Rood.
+            let hue = (1 - ratio) * 240;
+            return `hsl(${hue}, 100%, 50%)`;
+        }
+
+        // -- UI & Rendering --
+        function renderFileList() {
+            const list = document.getElementById('fileList');
+            list.innerHTML = '';
+            if (tracksData.length === 0) {
+                list.innerHTML = '<div class="text-sm text-slate-400 italic">Geen bestanden ingeladen.</div>';
+                return;
+            }
+
+            tracksData.forEach((track, index) => {
+                const div = document.createElement('div');
+                const isActive = index === activeTrackIndex;
+                const errorCount = track.errors.filter(e => !e.ignored).length;
+                
+                div.className = `p-3 rounded-md cursor-pointer flex justify-between items-center transition-colors border ${isActive ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}`;
+                div.onclick = () => selectTrack(index);
+                
+                div.innerHTML = `
+                    <div class="truncate flex-1 text-sm ${isActive ? 'font-semibold text-blue-900' : 'text-slate-700'}">
+                        ${track.filename}
+                    </div>
+                    ${errorCount > 0 ? `<div class="ml-2 w-6 h-6 flex items-center justify-center bg-red-100 text-red-600 rounded-full text-xs font-bold">${errorCount}</div>` : `<div class="ml-2 w-6 h-6 flex items-center justify-center bg-emerald-100 text-emerald-600 rounded-full text-xs font-bold">✓</div>`}
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function selectTrack(index) {
+            activeTrackIndex = index;
+            renderFileList();
+            drawMap();
+            renderErrorList();
+            document.getElementById('exportContainer').classList.remove('hidden');
+        }
+
+        function drawMap() {
+            trackLayerGroup.clearLayers();
+            errorMarkerLayer.clearLayers();
+
+            if (activeTrackIndex < 0 || activeTrackIndex >= tracksData.length) return;
+            const track = tracksData[activeTrackIndex];
+            const validPoints = track.points.filter(p => !p.deleted);
+            
+            if (validPoints.length < 2) return;
+
+            // Bepaal realistische min/max snelheid voor kleurschaal (negeer top 5% uitschieters voor de legende schaal)
+            let speeds = validPoints.map(p => p.speed).filter(s => s != null && s > 0);
+            speeds.sort((a,b) => a-b);
+            let minSpd = speeds.length > 0 ? speeds[Math.floor(speeds.length * 0.05)] : 0;
+            let maxSpd = speeds.length > 0 ? speeds[Math.floor(speeds.length * 0.95)] : 30; // Minimaal bereik van 30
+            
+            if(!maxSpd || maxSpd < 15) maxSpd = 15; // fallback
+
+            // Update Legenda
+            document.getElementById('leg-min').innerText = `${minSpd.toFixed(1)} km/h`;
+            document.getElementById('leg-max').innerText = `${maxSpd.toFixed(1)} km/h`;
+
+            // Teken de lijn in segmenten met verschillende kleuren
+            let latlngs = [];
+            for (let i = 1; i < validPoints.length; i++) {
+                const p1 = validPoints[i-1];
+                const p2 = validPoints[i];
+                const color = speedToColor(p2.speed, minSpd, maxSpd);
+                
+                // Om de kaart soepel te houden, voegen we lijntjes samen per 2 punten. 
+                // Leaflet polyline accepteert geen gradient, dus segmenteren is noodzakelijk.
+                L.polyline([[p1.lat, p1.lon], [p2.lat, p2.lon]], {
+                    color: color,
+                    weight: 5,
+                    opacity: 0.9,
+                    lineCap: 'round',
+                    lineJoin: 'round'
+                }).addTo(trackLayerGroup);
+            }
+
+            // Voeg markers toe voor actieve fouten
+            track.errors.filter(e => !e.ignored).forEach((err, i) => {
+                const marker = L.circleMarker([err.point.lat, err.point.lon], {
+                    color: '#ef4444', // Rood
+                    fillColor: '#ef4444',
+                    fillOpacity: 1,
+                    radius: 6,
+                    weight: 2
+                }).addTo(errorMarkerLayer);
+                
+                marker.bindPopup(`<b>Fout ${i+1}</b><br>${err.reason}<br>Waarde: ${err.value.toFixed(1)} ${err.unit}`);
+            });
+
+            // Zoom naar de route
+            map.fitBounds(trackLayerGroup.getBounds(), { padding: [20, 20] });
+        }
+
+        function renderErrorList() {
+            const list = document.getElementById('errorList');
+            const countEl = document.getElementById('errorCount');
+            list.innerHTML = '';
+            
+            if (activeTrackIndex < 0) return;
+            const track = tracksData[activeTrackIndex];
+            const activeErrors = track.errors.filter(e => !e.ignored);
+            
+            countEl.innerText = activeErrors.length;
+            
+            if (activeErrors.length === 0) {
+                list.innerHTML = `
+                <div class="bg-emerald-50 border border-emerald-200 text-emerald-700 p-4 rounded-lg flex flex-col items-center justify-center text-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mb-2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    <p class="font-medium">Geen fouten gevonden!</p>
+                    <p class="text-sm mt-1">De track ziet er goed uit, of de toegestane snelheid staat hoog ingesteld.</p>
+                </div>`;
+                return;
+            }
+
+            activeErrors.forEach((err, idx) => {
+                const div = document.createElement('div');
+                div.className = "bg-white border border-red-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-red-500";
+                
+                // Bij klik: zoom naar marker op kaart
+                div.onclick = () => {
+                    map.setView([err.point.lat, err.point.lon], 16);
+                    // Vind de juiste marker en open popup (simpele visuele feedback)
+                    L.circleMarker([err.point.lat, err.point.lon], {color: '#000', radius: 10, fill:false}).addTo(map).bringToFront();
+                    setTimeout(()=> { map.eachLayer(l => { if(l.options && l.options.fill === false) map.removeLayer(l); }) }, 1000);
+                };
+
+                div.innerHTML = `
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="font-semibold text-slate-800 text-sm flex items-center gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-500"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
+                            Fout ${idx + 1}
+                        </div>
+                        <div class="text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded">
+                            ${err.value.toFixed(1)} ${err.unit}
+                        </div>
+                    </div>
+                    <div class="text-xs text-slate-600 mb-3">${err.reason}</div>
+                    <div class="flex gap-2">
+                        <button onclick="event.stopPropagation(); fixError(${err.point.id}, 'delete')" class="flex-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 py-1.5 px-2 rounded text-xs font-medium transition-colors">Verwijder Punt</button>
+                        <button onclick="event.stopPropagation(); fixError(${err.point.id}, 'ignore')" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 py-1.5 px-2 rounded text-xs font-medium transition-colors">Negeer</button>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        // -- Fouten Oplossen --
+        function fixError(pointId, action) {
+            if (activeTrackIndex < 0) return;
+            const track = tracksData[activeTrackIndex];
+            
+            if (action === 'delete') {
+                const point = track.points.find(p => p.id === pointId);
+                if (point) {
+                    point.deleted = true;
+                    // Het originele XML element verwijderen uit de DOM Tree!
+                    if (point.originalNode && point.originalNode.parentNode) {
+                        point.originalNode.parentNode.removeChild(point.originalNode);
+                    }
+                }
+            } else if (action === 'ignore') {
+                const errorObj = track.errors.find(e => e.point.id === pointId);
+                if (errorObj) {
+                    errorObj.ignored = true;
+                }
+            }
+
+            // Als we een punt verwijderen, moet de data opnieuw berekend worden.
+            if (action === 'delete') {
+                calculateTrackData(track);
+            }
+
+            // Update de UI
+            drawMap();
+            renderErrorList();
+            renderFileList(); // Update checkmarks
+        }
+
+        function recalculateCurrent() {
+            if (activeTrackIndex >= 0) {
+                calculateTrackData(tracksData[activeTrackIndex]);
+                drawMap();
+                renderErrorList();
+                renderFileList();
+            }
+        }
+
+        // -- Exporteren --
+        function exportCurrentTrack() {
+            if (activeTrackIndex < 0) return;
+            const track = tracksData[activeTrackIndex];
+            
+            // Zet het XML object terug om naar een string
+            const serializer = new XMLSerializer();
+            const xmlString = serializer.serializeToString(track.originalDoc);
+            
+            // Maak een blob en een download link
+            const blob = new Blob([xmlString], {type: 'application/gpx+xml'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            
+            // Hernoem bestand
+            const newFilename = track.filename.replace('.gpx', '_fixed.gpx');
+            a.href = url;
+            a.download = newFilename;
+            
+            document.body.appendChild(a);
+            a.click();
+            
+            // Opruimen
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // -- Utils --
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'flex' : 'none';
+        }
+
+    </script>
+</body>
+</html>

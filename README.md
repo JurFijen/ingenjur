@@ -15,6 +15,6 @@
 * [Kroatie roaming netwerk](https://jurfijen.github.io/ingenjur/KrRoaming.html)
 * [zzr beun](https://jurfijen.github.io/ingenjur/ZZR.html)
 * [ZZR-Wedstrijden](https://jurfijen.github.io/ingenjur/ZZR-Wedstrijden.html)
-* [ZZR-Recap](https://jurfijen.github.io/ingenjur/PlotrRecapPro_26W18_ZZR.html)
+* [ZZR-BeunBV-Recap](https://jurfijen.github.io/ingenjur/PlotrRecapPro_26W18_ZZR.html)
 * 
 

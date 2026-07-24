@@ -1,6 +1,6 @@
 # ingenjur
 
-* [PlotrPlan Pro 0.1](https://jurfijen.github.io/ingenjur/plotrplan_pro0.1.html)
+* [PlotrPlan_26W30](https://jurfijen.github.io/ingenjur/PlotrPlan_26W30.html)
 * ---
 
 * [gps](https://jurfijen.github.io/ingenjur/gps.html)
